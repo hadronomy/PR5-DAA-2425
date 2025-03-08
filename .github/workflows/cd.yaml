@@ -1,0 +1,62 @@
+name: Build and Release
+on:
+  push:
+    tags:
+      - "**[0-9]+.[0-9]+.[0-9]+*"
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-changelog:
+    name: Generate changelog
+    runs-on: ubuntu-24.04
+    outputs:
+      release_body: ${{ steps.git-cliff.outputs.content }}
+    steps:
+      - name: Generate GitHub token
+        uses: actions/create-github-app-token@v1
+        id: generate-token
+        with:
+          app-id: ${{ secrets.APP_ID }} # <-- GitHub App ID secret name
+          private-key: ${{ secrets.APP_PRIVATE_KEY }} # <-- GitHub App private key secret name
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate a changelog
+        uses: orhun/git-cliff-action@main
+        id: git-cliff
+        with:
+          config: cliff.toml
+          args: -vv --latest --no-exec -s header --ignore-tags release
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+          OUTPUT: CHANGELOG.md
+
+  build-release:
+    name: Build and Release
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    needs: generate-changelog
+    steps:
+      - uses: actions/checkout@v4
+      - name: Typst
+        uses: lvignoli/typst-action@main
+        with:
+          source_file: |
+            report/report.typ
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          name: "${{ github.ref_name }}"
+          body: "${{ needs.generate-changelog.outputs.release_body }}"
+          files: |
+            report/report.pdf

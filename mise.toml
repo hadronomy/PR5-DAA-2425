@@ -1,0 +1,3 @@
+[tools]
+"cargo:ouch" = "latest"
+just = "latest"
