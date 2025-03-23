@@ -1055,3 +1055,7 @@ output
 out.txt
 *.dot
 !docs/*.dot
+
+# zig
+.zig-cache
+zig-out

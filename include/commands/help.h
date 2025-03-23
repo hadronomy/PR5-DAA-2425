@@ -1,5 +1,7 @@
 #pragma once
 
+#include <fmt/core.h>
+
 #include "command_handler.h"
 #include "command_registry.h"
 #include "ui.h"

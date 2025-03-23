@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include <fmt/core.h>
+
 #include "algorithm_registry.h"
 #include "benchmarking.h"
 #include "command_handler.h"
