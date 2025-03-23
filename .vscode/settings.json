@@ -1,3 +1,8 @@
 {
-  "terminal.integrated.defaultProfile.linux": "bash"
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}/sources/poky/bitbake/lib"
+  ],
+  "C_Cpp.default.compileCommands": "/home/hadronomy/practicas/DAA/PR5/builddir/compile_commands.json",
+  "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild"
 }

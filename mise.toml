@@ -1,5 +1,6 @@
 [tools]
 "cargo:ouch" = "latest"
 just = "latest"
+meson = "latest"
 zig = "0.14.0"
 zls = "0.14.0"

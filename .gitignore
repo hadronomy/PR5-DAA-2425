@@ -1059,3 +1059,4 @@ out.txt
 # zig
 .zig-cache
 zig-out
+!src/build
