@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const utils = @import("utils.zig");
+
 const DependencyResources = @This();
 
 steps: []*std.Build.Step,
@@ -17,12 +19,26 @@ pub fn init(
     var steps = std.ArrayList(*std.Build.Step).init(b.allocator);
     errdefer steps.deinit();
 
+    var lib_paths = std.StringHashMap([]const u8).init(b.allocator);
+    errdefer {
+        var it = lib_paths.iterator();
+        while (it.next()) |entry| {
+            b.allocator.free(entry.key_ptr.*);
+            b.allocator.free(entry.value_ptr.*);
+        }
+        lib_paths.deinit();
+    }
+
     // CLI11
     const cli11_src = b.dependency("CLI11", .{
         .target = target,
         .optimize = optimize,
     });
     const cli11_lib = cli11_src.path("./include");
+    try lib_paths.put(
+        try b.allocator.dupe(u8, "CLI11"),
+        try b.allocator.dupe(u8, cli11_src.path(".").getPath(b)),
+    );
 
     // FMT
     const fmt_src = b.dependency("fmt", .{
@@ -43,6 +59,10 @@ pub fn init(
         .{
             .include_extensions = &[_][]const u8{".h"},
         },
+    );
+    try lib_paths.put(
+        try b.allocator.dupe(u8, "fmt"),
+        try b.allocator.dupe(u8, fmt_src.path(".").getPath(b)),
     );
 
     // Find FMT source files
@@ -66,6 +86,12 @@ pub fn init(
         .optimize = optimize,
     });
     const tabulate_lib = tabulate_src.path("./include");
+    try lib_paths.put(
+        try b.allocator.dupe(u8, "tabulate"),
+        try b.allocator.dupe(u8, tabulate_src.path(".").getPath(b)),
+    );
+
+    try writeDependencyCache(b, lib_paths);
 
     return .{
         .steps = steps.items,
@@ -74,6 +100,34 @@ pub fn init(
         .tabulate_include = tabulate_lib,
         .fmt_lib_include = fmt_lib_path,
     };
+}
+
+fn writeDependencyCache(b: *std.Build, lib_paths: std.StringHashMap([]const u8)) !void {
+    // Ensure the .zig-cache directory exists
+    const cache_dir = b.path(try utils.relativePath(b, b.cache_root.path orelse ".zig-cache"));
+    std.fs.cwd().makeDir(cache_dir.getPath(b)) catch |err| {
+        if (err != error.PathAlreadyExists) return err;
+    };
+
+    // Create the cache file
+    const cache_path = cache_dir.path(b, "dependency-paths.txt").getPath(b);
+    const file = try std.fs.cwd().createFile(cache_path, .{});
+    defer file.close();
+
+    var writer = std.json.writeStream(
+        file.writer(),
+        .{
+            .whitespace = .indent_2,
+        },
+    );
+
+    try writer.beginObject();
+    var iterator = lib_paths.iterator();
+    while (iterator.next()) |entry| {
+        try writer.objectField(entry.key_ptr.*);
+        try writer.write(entry.value_ptr.*);
+    }
+    try writer.endObject();
 }
 
 pub fn install(self: *const DependencyResources, exe: *std.Build.Step.Compile) void {

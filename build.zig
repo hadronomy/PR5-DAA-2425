@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 
 const DependencyResources = @import("src/build/DependencyResources.zig");
 const ParserResources = @import("src/build/ParserResources.zig");
+const WriteConfigHeader = @import("src/build/WriteConfigHeader.zig");
 
 const cfiles_exts = [_][]const u8{ ".c", ".cpp", ".cxx", ".c++", ".cc" };
 const header_exts = [_][]const u8{ ".h", ".hpp", ".hxx", ".h++", ".hh" };
@@ -62,10 +63,20 @@ pub fn build(b: *std.Build) !void {
         .tsp_VERSION = "0.1.0",
         .PROJECT_NAME = "tsp", // TODO: get from config
     });
-    exe.addConfigHeader(config_h); // TODO: Find a way to write the file
+    const write_config_h = WriteConfigHeader.create(b, .{
+        .config_header = config_h,
+        .output_dir = b.path("include"),
+    });
+    exe.step.dependOn(&write_config_h.step);
 
     // Initialize parser resources
-    const parser_resources = try ParserResources.init(b, "include/parser/tsp_lexer.l", "include/parser/tsp_parser.y", &cfiles_exts, &header_exts, exe // Pass the executable here
+    var parser_resources = try ParserResources.init(
+        b,
+        "include/parser/tsp_lexer.l",
+        "include/parser/tsp_parser.y",
+        &cfiles_exts,
+        &header_exts,
+        exe,
     );
     parser_resources.install(exe);
 
@@ -89,15 +100,9 @@ pub fn build(b: *std.Build) !void {
     });
 
     // Add specific steps to run just flex or bison
-    const flex_run_step = b.step("flex", "Generate lexer from flex file");
-    if (parser_resources.flex_step) |flex_step| {
-        flex_run_step.dependOn(&flex_step.step);
-    }
-
-    const bison_run_step = b.step("bison", "Generate parser from bison file");
-    if (parser_resources.bison_step) |bison_step| {
-        bison_run_step.dependOn(&bison_step.step);
-    }
+    const generate_step = b.step("generate", "Generate lexer and parser files");
+    generate_step.dependOn(parser_resources.step);
+    generate_step.dependOn(&write_config_h.step);
 
     b.installArtifact(exe);
 

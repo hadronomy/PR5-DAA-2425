@@ -9,9 +9,7 @@ steps: []*std.Build.Step,
 flex_step: ?*std.Build.Step.Run = null,
 bison_step: ?*std.Build.Step.Run = null,
 binary_dir: []const u8,
-generated_sources: [][]const u8,
-generated_headers: [][]const u8,
-find_step: ?*std.Build.Step = null,
+step: *std.Build.Step,
 
 pub fn init(
     b: *std.Build,
@@ -42,27 +40,17 @@ pub fn init(
     const flex_step = makeFlexStep(b, flex_file, binary_dir);
     flex_step.step.dependOn(&bison_step.step);
 
-    // Find generated source files - wait until after flex/bison run
-    const wait_step = b.addSystemCommand(&[_][]const u8{ "sleep", "1" }); // Small delay to ensure files exist
-    wait_step.step.dependOn(&flex_step.step);
-
     // Find, copy files, and add them directly to the executable
     const copy_files_step = makeCopyFilesStep(b, binary_dir, cfiles_exts, header_exts, exe);
-    copy_files_step.dependOn(&wait_step.step);
+    copy_files_step.dependOn(&flex_step.step);
     try steps.append(copy_files_step);
-
-    // Return empty arrays since we're not tracking them this way anymore
-    const empty_sources: [][]const u8 = &[_][]const u8{};
-    const empty_headers: [][]const u8 = &[_][]const u8{};
 
     return .{
         .steps = steps.items,
         .flex_step = flex_step,
         .bison_step = bison_step,
         .binary_dir = binary_dir,
-        .generated_sources = empty_sources,
-        .generated_headers = empty_headers,
-        .find_step = copy_files_step,
+        .step = copy_files_step,
     };
 }
 
@@ -215,7 +203,7 @@ fn makeCopyFilesStep(
                 const src_path = self.build.fmt("{s}/{s}", .{ self.binary_dir, source_file });
                 const dest_basename = std.fs.path.basename(source_file);
                 const dest_path = self.build.fmt("{s}/{s}", .{ generated_dir, dest_basename });
-                
+
                 // For creating the proper relative path for the build system
                 const rel_dest_path = self.build.fmt("generated/{s}", .{dest_basename});
 
