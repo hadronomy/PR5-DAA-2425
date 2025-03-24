@@ -193,8 +193,7 @@ fn makeCopyFilesStep(
             const generated_dir = self.build.pathFromRoot("generated");
             std.fs.cwd().makePath(generated_dir) catch |err| {
                 if (err != error.PathAlreadyExists) {
-                    std.debug.print("Error creating directory {s}: {any}\n", .{ generated_dir, err });
-                    return err;
+                    return self.step.addError("Error creating directory {s}: {any}\n", .{ generated_dir, err });
                 }
             };
 
@@ -225,7 +224,6 @@ fn makeCopyFilesStep(
                         "-fno-sanitize=undefined",
                     },
                 });
-                std.debug.print("  Added file: {s}\n", .{dest_path});
             }
 
             // Copy header files
@@ -250,8 +248,6 @@ fn makeCopyFilesStep(
                 } else {
                     std.debug.print("  All {d} file operations failed\n", .{file_count});
                 }
-            } else {
-                std.debug.print("Copied {d} files successfully ({d} errors)\n", .{ file_count - error_count, error_count });
             }
         }
     };

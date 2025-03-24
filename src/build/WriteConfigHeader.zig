@@ -62,9 +62,6 @@ pub fn make(step: *Step, options: Step.MakeOptions) anyerror!void {
     const header_file = try b.allocator.dupe(u8, write_config_header.config_header.output_file.getPath());
     defer b.allocator.free(header_file);
 
-    std.debug.print("writing config header to {s}\n", .{header_file});
-    std.debug.print("output dir: {s}\n", .{output_dir});
-
     var output = std.ArrayList(u8).init(gpa);
     defer output.deinit();
 
