@@ -27,6 +27,7 @@ const cppflags = [_][]const u8{
     "-Wno-unqualified-std-cast-call",
     "-Wno-bitwise-instead-of-logical", //for notcurses
     "-fno-sanitize=undefined",
+    "-MJ=compile_commands.json",
 };
 
 pub fn build(b: *std.Build) !void {
