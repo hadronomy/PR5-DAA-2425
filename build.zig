@@ -85,6 +85,9 @@ pub fn build(b: *std.Build) !void {
     // Add specific steps to run just flex or bison
     generate_step.dependOn(parser_resources.step);
     generate_step.dependOn(&write_config_h.step);
+    buildpkg.compile_commands.createStep(b, "zcc", .{
+        .target = exe,
+    });
 
     b.installArtifact(exe);
 
