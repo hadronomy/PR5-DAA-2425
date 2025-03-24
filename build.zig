@@ -1,14 +1,13 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const config = @import("src/build/config.zig");
-const DependencyResources = @import("src/build/DependencyResources.zig");
-const ParserResources = @import("src/build/ParserResources.zig");
-const WriteConfigHeader = @import("src/build/WriteConfigHeader.zig");
+const buildpkg = @import("src/build/main.zig");
+const config = buildpkg.config;
 
 // TODO: Improve upon this
 // sources:
 // - https://ziggit.dev/docs?topic=3531
+// - https://github.com/ghostty-org/ghostty/blob/main/build.zig
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
@@ -49,14 +48,14 @@ pub fn build(b: *std.Build) !void {
             .PROJECT_NAME = "tsp", // TODO: get from config
         },
     );
-    const write_config_h = WriteConfigHeader.create(b, .{
+    const write_config_h = buildpkg.Step.WriteConfigHeader.create(b, .{
         .config_header = config_h,
         .output_dir = b.path("include"),
     });
     exe.step.dependOn(&write_config_h.step);
 
     // Initialize parser resources
-    var parser_resources = try ParserResources.init(
+    const parser_resources = try buildpkg.ParserResources.init(
         b,
         "include/parser/tsp_lexer.l",
         "include/parser/tsp_parser.y",
@@ -64,16 +63,15 @@ pub fn build(b: *std.Build) !void {
         &config.header_exts,
         exe,
     );
-    parser_resources.install(exe);
 
     // Initialize dependency resources
-    const dep_resources = try DependencyResources.init(
+    _ = try buildpkg.DependencyResources.init(
         b,
         target,
         optimize,
         &config.cppflags,
+        exe,
     );
-    dep_resources.install(exe);
 
     // Add source files to the executable
     const sources = try findFilesRecursive(b, "src", &config.cfiles_exts);

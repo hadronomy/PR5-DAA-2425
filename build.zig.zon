@@ -48,6 +48,10 @@
             .url = "https://github.com/p-ranav/tabulate/archive/refs/tags/v1.5.tar.gz",
             .hash = "N-V-__8AAFmgMQAOiZi-Nfdvp1ynVwEaOrRKpmm6wNPsVU-4",
         },
+        .cimgui_zig = .{
+            .url = "git+https://github.com/tiawl/cimgui.zig#6aa0a26ea379a18d262e8c3c0402f4697a2fc080",
+            .hash = "cimgui_zig-1.0.0-2Xubkvw0SgBoOiwAhJKtFyDQQu-Pi-s9RPBfIQwvw8Xd",
+        },
     },
     .paths = .{
         "build.zig",

@@ -1,8 +1,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const utils = @import("utils.zig");
 const config = @import("config.zig");
+const utils = @import("utils.zig");
 
 const ParserResources = @This();
 
@@ -45,6 +45,10 @@ pub fn init(
     const copy_files_step = makeCopyFilesStep(b, binary_dir, cfiles_exts, header_exts, exe);
     copy_files_step.dependOn(&flex_step.step);
     try steps.append(copy_files_step);
+
+    for (steps.items) |step| {
+        exe.step.dependOn(step);
+    }
 
     return .{
         .steps = steps.items,
@@ -261,13 +265,6 @@ fn makeCopyFilesStep(
     };
 
     return &copy_step.step;
-}
-
-pub fn install(self: *const ParserResources, exe: *std.Build.Step.Compile) void {
-    // Add dependency on all steps
-    for (self.steps) |step| {
-        exe.step.dependOn(step);
-    }
 }
 
 pub fn getGeneratedSourcePaths(self: *const ParserResources, b: *std.Build, allocator: std.mem.Allocator) ![][]const u8 {
