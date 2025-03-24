@@ -48,8 +48,8 @@ pub fn build(b: *std.Build) !void {
             .include_path = "config.h",
         },
         .{
-            .tsp_VERSION = "0.1.0",
-            .PROJECT_NAME = "tsp", // TODO: get from config
+            .tsp_VERSION = config.version,
+            .PROJECT_NAME = config.program_name,
         },
     );
     const write_config_h = buildpkg.Step.WriteConfigHeader.create(b, .{

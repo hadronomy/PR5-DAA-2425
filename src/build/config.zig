@@ -1,6 +1,8 @@
+pub const program_name = "tsp";
+pub const version = "0.1.0";
+
 pub const cfiles_exts = [_][]const u8{ ".c", ".cpp", ".cxx", ".c++", ".cc" };
 pub const header_exts = [_][]const u8{ ".h", ".hpp", ".hxx", ".h++", ".hh" };
-pub const program_name = "main";
 
 pub const Extension = enum {
     @".c",
