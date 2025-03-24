@@ -32,7 +32,8 @@ Application& Application::withStandardCommands() {
   registerCommand<BenchmarkCommand>()
     .registerCommand<CompareCommand>()
     .registerCommand<ListAlgorithmsCommand>()
-    .registerCommand<ValidateCommand>();
+    .registerCommand<ValidateCommand>()
+    .registerCommand<VisualizeCommand>();
   return *this;
 }
 

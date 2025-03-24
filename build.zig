@@ -27,13 +27,6 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    if (optimize != .Debug) {
-        switch (target.result.os.tag) {
-            .windows => exe.subsystem = .Windows,
-            else => exe.subsystem = .Posix,
-        }
-    }
-
     exe.linkLibCpp();
     exe.linkLibC();
     exe.addSystemIncludePath(.{
@@ -69,6 +62,7 @@ pub fn build(b: *std.Build) !void {
     );
 
     // Initialize dependency resources
+    linkGlfw(b, exe, target);
     _ = try buildpkg.DependencyResources.init(
         b,
         target,
@@ -102,6 +96,18 @@ pub fn build(b: *std.Build) !void {
         }
 
         run_step.dependOn(&run_cmd.step);
+    }
+}
+
+fn linkGlfw(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Build.ResolvedTarget) void {
+    _ = b;
+    if (target.query.os_tag == .windows) {
+        exe.linkSystemLibrary("gdi32");
+        exe.linkSystemLibrary("shell32");
+        exe.linkSystemLibrary("opengl32");
+    } else {
+        exe.linkSystemLibrary("gl");
+        exe.linkSystemLibrary("glfw");
     }
 }
 

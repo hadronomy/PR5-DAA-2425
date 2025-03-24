@@ -49,8 +49,8 @@
             .hash = "N-V-__8AAFmgMQAOiZi-Nfdvp1ynVwEaOrRKpmm6wNPsVU-4",
         },
         .cimgui_zig = .{
-            .url = "git+https://github.com/tiawl/cimgui.zig#6aa0a26ea379a18d262e8c3c0402f4697a2fc080",
-            .hash = "cimgui_zig-1.0.0-2Xubkvw0SgBoOiwAhJKtFyDQQu-Pi-s9RPBfIQwvw8Xd",
+            .url = "git+https://github.com/hadronomy/cimgui.zig#81607199bc3b5517c0d98acdf224ffb1c205b0dc",
+            .hash = "cimgui_zig-1.0.0-2XubknUmUwBJK-6_D4e7vo9BLJVmyY79mBMBiWnZSS10",
         },
     },
     .paths = .{
