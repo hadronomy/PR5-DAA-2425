@@ -1,43 +1,19 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+const config = @import("src/build/config.zig");
 const DependencyResources = @import("src/build/DependencyResources.zig");
 const ParserResources = @import("src/build/ParserResources.zig");
 const WriteConfigHeader = @import("src/build/WriteConfigHeader.zig");
-
-const cfiles_exts = [_][]const u8{ ".c", ".cpp", ".cxx", ".c++", ".cc" };
-const header_exts = [_][]const u8{ ".h", ".hpp", ".hxx", ".h++", ".hh" };
-const program_name = "main";
-
-const Extension = enum {
-    @".c",
-    @".cpp",
-    @".m",
-};
-
-const cppflags = [_][]const u8{
-    "-DASIO_HAS_THREADS",
-    "-fcolor-diagnostics",
-    "-std=c++20",
-    // "-Wall",
-    // "-Wextra",
-    // "-Werror",
-    // "-Wpedantic",
-    "-Wno-deprecated-declarations",
-    "-Wno-unqualified-std-cast-call",
-    "-Wno-bitwise-instead-of-logical", //for notcurses
-    "-fno-sanitize=undefined",
-    "-MJ=compile_commands.json",
-};
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
     const triple = try target.result.linuxTriple(b.allocator);
-    const sources = try findFilesRecursive(b, "src", &cfiles_exts);
+    const sources = try findFilesRecursive(b, "src", &config.cfiles_exts);
 
     const exe = b.addExecutable(.{
-        .name = b.fmt("{s}-{s}-{s}", .{ program_name, triple, @tagName(optimize) }),
+        .name = b.fmt("{s}-{s}-{s}", .{ config.program_name, triple, @tagName(optimize) }),
         .target = target,
         .optimize = optimize,
     });
@@ -75,8 +51,8 @@ pub fn build(b: *std.Build) !void {
         b,
         "include/parser/tsp_lexer.l",
         "include/parser/tsp_parser.y",
-        &cfiles_exts,
-        &header_exts,
+        &config.cfiles_exts,
+        &config.header_exts,
         exe,
     );
     parser_resources.install(exe);
@@ -86,7 +62,7 @@ pub fn build(b: *std.Build) !void {
         b,
         target,
         optimize,
-        &cppflags,
+        &config.cppflags,
     );
     dep_resources.install(exe);
 
@@ -97,7 +73,7 @@ pub fn build(b: *std.Build) !void {
     // Add source files to executable
     exe.addCSourceFiles(.{
         .files = all_sources.items,
-        .flags = &cppflags,
+        .flags = &config.cppflags,
     });
 
     // Add specific steps to run just flex or bison

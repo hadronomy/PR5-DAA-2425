@@ -2,6 +2,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const utils = @import("utils.zig");
+const config = @import("config.zig");
 
 const ParserResources = @This();
 
@@ -214,15 +215,7 @@ fn makeCopyFilesStep(
                 // Add to executable using the proper LazyPath syntax with a path relative to build root
                 self.exe.addCSourceFile(.{
                     .file = self.build.path(rel_dest_path),
-                    .flags = &[_][]const u8{
-                        "-DASIO_HAS_THREADS",
-                        "-fcolor-diagnostics",
-                        "-std=c++20",
-                        "-Wno-deprecated-declarations",
-                        "-Wno-unqualified-std-cast-call",
-                        "-Wno-bitwise-instead-of-logical",
-                        "-fno-sanitize=undefined",
-                    },
+                    .flags = &config.cppflags,
                 });
             }
 
