@@ -9,6 +9,10 @@ const config = buildpkg.config;
 // - https://ziggit.dev/docs?topic=3531
 // - https://github.com/ghostty-org/ghostty/blob/main/build.zig
 
+comptime {
+    buildpkg.zig.requireZig("0.14.0");
+}
+
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
