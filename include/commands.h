@@ -15,7 +15,6 @@
 // IWYU pragma: begin_exports
 #include "commands/benchmark.h"
 #include "commands/compare.h"
-#include "commands/help.h"
 #include "commands/list.h"
 #include "commands/validate.h"
 #include "commands/visualize.h"

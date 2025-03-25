@@ -3,10 +3,8 @@
 #include <fmt/core.h>
 
 #include "algorithm_registry.h"
-#include "benchmarking.h"
 #include "command_handler.h"
 #include "command_registry.h"
-#include "ui.h"
 
 /**
  * Command handler for benchmark command
@@ -36,52 +34,7 @@ class BenchmarkCommand : public CommandHandler {
     }
   }
 
-  bool execute() override {
-    try {
-      if (!AlgorithmRegistry::exists(algo_name_)) {
-        UI::error(fmt::format("Algorithm '{}' not found", algo_name_));
-        return false;
-      }
-
-      if (verbose_) {
-        UI::info(fmt::format("Benchmarking algorithm: {}", algo_name_));
-
-        if (!input_files_.empty()) {
-          UI::info(fmt::format(
-            "Configuration: iterations={}, input_files={}, time_limit={}ms",
-            iterations_,
-            fmt::join(input_files_, ","),
-            time_limit_ms_
-          ));
-        } else {
-          UI::info(fmt::format(
-            "Configuration: iterations={}, sizes={}, time_limit={}ms",
-            iterations_,
-            fmt::join(test_sizes_, ","),
-            time_limit_ms_
-          ));
-        }
-      }
-
-      // Set the global time limit for all algorithms - now works with non-const static variable
-      Algorithm::DEFAULT_TIME_LIMIT_MS = time_limit_ms_;
-
-      // Use either files or generated data
-      if (!input_files_.empty()) {
-        run_benchmark_with_files(algo_name_, iterations_, input_files_, debug_, time_limit_ms_);
-      } else {
-        run_benchmark(algo_name_, iterations_, test_sizes_, debug_, time_limit_ms_);
-      }
-
-      if (verbose_) {
-        UI::success("Benchmark completed successfully");
-      }
-      return true;
-    } catch (const std::exception& e) {
-      UI::error(fmt::format("Benchmark failed: {}", e.what()));
-      return false;
-    }
-  }
+  bool execute() override;
 
   /**
    * Register this command with the command registry

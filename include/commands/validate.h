@@ -4,8 +4,6 @@
 
 #include "command_handler.h"
 #include "command_registry.h"
-#include "parser/tsp_driver.h"
-#include "ui.h"
 
 /**
  * Command handler for help command
@@ -15,16 +13,7 @@ class ValidateCommand : public CommandHandler {
  public:
   ValidateCommand(const std::string& path, bool verbose) : CommandHandler(verbose), path_(path) {}
 
-  bool execute() override {
-
-    TSPDriver driver;
-    bool success = driver.parse_file(path_);
-    if (!success) {
-      return false;
-    }
-    std::cout << driver.graph.serializeSimpleFormat() << std::endl;
-    return success;
-  }
+  bool execute() override;
 
   /**
    * Register this command with the command registry
