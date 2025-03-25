@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 #include <fmt/color.h>
 
 // Type-safe enum for command types

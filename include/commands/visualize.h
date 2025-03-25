@@ -1,10 +1,9 @@
 #pragma once
 
-#include <fmt/core.h>
 #include <string>
+#include <thread>
 
-#include "command_handler.h"
-#include "command_registry.h"
+#include <fmt/core.h>
 
 // ImGui and OpenGL headers
 #include <GLFW/glfw3.h>
@@ -12,6 +11,9 @@
 #include "backends/imgui_impl_opengl3.h"
 #include "imgui.h"
 #include "imgui_internal.h"
+
+#include "command_handler.h"
+#include "command_registry.h"
 
 /**
  * Command handler for visualize command
