@@ -65,7 +65,7 @@ inline bool VisualizeCommand::execute() {
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;      // Enable Docking
-  io.ConfigDockingWithShift = false;                     // Enable docking without shift key
+  io.ConfigDockingWithShift = true;                      // Enable docking with shift key
 
   // Setup Dear ImGui style
   ImGui::StyleColorsDark();
