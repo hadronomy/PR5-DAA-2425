@@ -63,6 +63,8 @@ pub fn build(b: *std.Build) !void {
 
     // Initialize dependency resources
     linkGlfw(b, exe, target);
+    linkVulkan(b, exe, target);
+
     _ = try buildpkg.DependencyResources.init(
         b,
         target,
@@ -81,6 +83,7 @@ pub fn build(b: *std.Build) !void {
         .files = all_sources.items,
         .flags = &config.cppflags,
     });
+    _ = try exe.step.addDirectoryWatchInput(b.path("src"));
 
     // Add specific steps to run just flex or bison
     generate_step.dependOn(parser_resources.step);
@@ -107,11 +110,22 @@ fn linkGlfw(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Build.Resol
     if (target.query.os_tag == .windows) {
         exe.linkSystemLibrary("gdi32");
         exe.linkSystemLibrary("shell32");
-        exe.linkSystemLibrary("opengl32");
     } else {
-        exe.linkSystemLibrary("gl");
         exe.linkSystemLibrary("glfw");
     }
+}
+
+fn linkVulkan(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Build.ResolvedTarget) void {
+    _ = target;
+    exe.addIncludePath(b.path("deps/lib/shared"));
+    // exe.addCSourceFile(.{
+    //     .file = b.path("deps/lib/shared/volk.c"),
+    // });
+    // if (target.query.os_tag == .windows) {
+    //     exe.addObjectFile(b.path("deps/lib/win/vulkan-1.lib"));
+    // } else {
+    //     exe.linkSystemLibrary("vulkan");
+    // }
 }
 
 fn findFilesRecursive(b: *std.Build, dir_name: []const u8, exts: []const []const u8) ![][]const u8 {

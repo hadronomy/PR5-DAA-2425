@@ -96,7 +96,7 @@ pub fn init(
         .target = target,
         .optimize = optimize,
         .platform = cimgui.Platform.GLFW,
-        .renderer = cimgui.Renderer.OpenGL3,
+        .renderer = cimgui.Renderer.Vulkan,
     });
 
     exe.addIncludePath(cli11_lib);
