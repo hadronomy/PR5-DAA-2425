@@ -1,9 +1,17 @@
+
+// Include raylib headers only in the implementation file
+#include "imgui_internal.h"
+
+#include "raylib.h"
+#include "rlImGui.h"
+
 #include "visualization/gui_manager.h"
 
+
 GuiManager::GuiManager()
-    : window_(nullptr),
-      glsl_version_("#version 130"),
-      clear_color_(ImVec4(0.45f, 0.55f, 0.60f, 1.00f)),
+    : screen_width_(1280),
+      screen_height_(720),
+      clear_color_(DARKGRAY),
       show_demo_window_(true),
       show_another_window_(false),
       first_time_(true),
@@ -14,23 +22,10 @@ GuiManager::~GuiManager() {
 }
 
 bool GuiManager::initialize() {
-  // Set up error callback
-  glfwSetErrorCallback(glfw_error_callback);
-  if (!glfwInit())
-    return false;
-
-  // Decide GL+GLSL versions
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
-
-  // Create window with graphics context
-  window_ = glfwCreateWindow(1280, 720, "Visualization Window", nullptr, nullptr);
-  if (window_ == nullptr) {
-    glfwTerminate();
-    return false;
-  }
-  glfwMakeContextCurrent(window_);
-  glfwSwapInterval(1);  // Enable vsync
+  // Initialize raylib window
+  SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_VSYNC_HINT | FLAG_WINDOW_RESIZABLE);
+  InitWindow(screen_width_, screen_height_, "Visualization Window");
+  SetTargetFPS(60);  // Set target framerate
 
   setupImGui();
 
@@ -38,94 +33,62 @@ bool GuiManager::initialize() {
 }
 
 void GuiManager::setupImGui() {
-  // Setup Dear ImGui context
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
-  (void)io;
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
-  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;      // Enable Docking
-  io.ConfigDockingWithShift = true;                      // Enable docking with shift key
+  // Setup ImGui context with rlImGui
+  rlImGuiSetup(true);
 
-  // Setup Dear ImGui style
-  ImGui::StyleColorsDark();
-
-  // Setup Platform/Renderer backends
-  ImGui_ImplGlfw_InitForOpenGL(window_, true);
-  ImGui_ImplOpenGL3_Init(glsl_version_);
+  // Enable docking if available
+#ifdef IMGUI_HAS_DOCK
+  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  ImGui::GetIO().ConfigDockingWithShift = true;  // Enable docking with shift key
+#endif
 }
 
 void GuiManager::run() {
   // Main loop
-  while (!glfwWindowShouldClose(window_)) {
-    // Poll and handle events (inputs, window resize, etc.)
-    glfwPollEvents();
-    if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) != 0) {
-      // Wait a bit when window is minimized to avoid high CPU usage
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      continue;
-    }
+  while (!WindowShouldClose()) {
+    // Start drawing frame
+    BeginDrawing();
 
-    // Start the Dear ImGui frame
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
+    // Clear background with the set color
+    ClearBackground(clear_color_);
 
-    // Create dockspace over the entire window
-    const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImGui::SetNextWindowPos(viewport->WorkPos);
-    ImGui::SetNextWindowSize(viewport->WorkSize);
-    ImGui::SetNextWindowViewport(viewport->ID);
+    // Draw anything that should appear behind the ImGui interface
+    DrawCircle(GetScreenWidth() / 2, GetScreenHeight() / 2, GetScreenHeight() * 0.45f, DARKGREEN);
 
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
-    window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse;
-    window_flags |= ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-    window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+    // Start ImGui rendering
+    rlImGuiBegin();
 
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    ImGui::Begin("DockSpace", nullptr, window_flags);
-    ImGui::PopStyleVar(3);
-
-    // Submit the DockSpace
-    dockspace_id_ = ImGui::GetID("MainWindowDockspace");
-    ImGui::DockSpace(dockspace_id_, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
+    // Create dockspace over the entire window (if docking is available)
+#ifdef IMGUI_HAS_DOCK
+    ImGui::DockSpaceOverViewport(0, NULL, ImGuiDockNodeFlags_PassthruCentralNode);
 
     if (first_time_) {
-      setupDocking(viewport);
+      setupDocking();
     }
+#endif
 
     renderMenuBar();
-    ImGui::End();  // End DockSpace
-
     renderLeftPanel();
     renderRightPanel();
     renderMainWindows();
 
-    // Rendering
-    ImGui::Render();
-    int display_w, display_h;
-    glfwGetFramebufferSize(window_, &display_w, &display_h);
-    glViewport(0, 0, display_w, display_h);
-    glClearColor(
-      clear_color_.x * clear_color_.w,
-      clear_color_.y * clear_color_.w,
-      clear_color_.z * clear_color_.w,
-      clear_color_.w
-    );
-    glClear(GL_COLOR_BUFFER_BIT);
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    // End ImGui rendering
+    rlImGuiEnd();
 
-    glfwSwapBuffers(window_);
+    // End drawing frame
+    EndDrawing();
   }
 }
 
-void GuiManager::setupDocking(const ImGuiViewport* viewport) {
+void GuiManager::setupDocking() {
   first_time_ = false;
+
+#ifdef IMGUI_HAS_DOCK
+  dockspace_id_ = ImGui::GetID("MainWindowDockspace");
   ImGui::DockBuilderRemoveNode(dockspace_id_);
   ImGui::DockBuilderAddNode(dockspace_id_, ImGuiDockNodeFlags_DockSpace);
+
+  const ImGuiViewport* viewport = ImGui::GetMainViewport();
   ImGui::DockBuilderSetNodeSize(dockspace_id_, viewport->Size);
 
   // Split the dockspace into sections
@@ -141,13 +104,14 @@ void GuiManager::setupDocking(const ImGuiViewport* viewport) {
   ImGui::DockBuilderDockWindow("Hello, world!", dock_main_id);
   ImGui::DockBuilderDockWindow("Another Window", dock_main_id);
   ImGui::DockBuilderFinish(dockspace_id_);
+#endif
 }
 
 void GuiManager::renderMenuBar() {
-  if (ImGui::BeginMenuBar()) {
+  if (ImGui::BeginMainMenuBar()) {
     if (ImGui::BeginMenu("File")) {
       if (ImGui::MenuItem("Exit", "Alt+F4")) {
-        glfwSetWindowShouldClose(window_, true);
+        CloseWindow();
       }
       ImGui::EndMenu();
     }
@@ -158,7 +122,7 @@ void GuiManager::renderMenuBar() {
       ImGui::EndMenu();
     }
 
-    ImGui::EndMenuBar();
+    ImGui::EndMainMenuBar();
   }
 }
 
@@ -169,7 +133,19 @@ void GuiManager::renderLeftPanel() {
   ImGui::TextWrapped("This panel could contain navigation, properties, or other controls.");
 
   if (ImGui::CollapsingHeader("Settings")) {
-    ImGui::ColorEdit3("Background Color", (float*)&clear_color_);
+    float color[4] = {
+      clear_color_.r / 255.0f,
+      clear_color_.g / 255.0f,
+      clear_color_.b / 255.0f,
+      clear_color_.a / 255.0f
+    };
+
+    if (ImGui::ColorEdit3("Background Color", color)) {
+      clear_color_ = (Color){(unsigned char)(color[0] * 255),
+                             (unsigned char)(color[1] * 255),
+                             (unsigned char)(color[2] * 255),
+                             (unsigned char)(color[3] * 255)};
+    }
   }
 
   ImGui::End();
@@ -185,6 +161,7 @@ void GuiManager::renderRightPanel() {
   ImGuiIO& io = ImGui::GetIO();
   ImGui::Text("Performance");
   ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+  ImGui::Text("Raylib FPS: %d", GetFPS());
 
   ImGui::End();
 }
@@ -206,7 +183,20 @@ void GuiManager::renderMainWindows() {
     ImGui::Checkbox("Another Window", &show_another_window_);
 
     ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-    ImGui::ColorEdit3("clear color", (float*)&clear_color_);
+
+    float color[4] = {
+      clear_color_.r / 255.0f,
+      clear_color_.g / 255.0f,
+      clear_color_.b / 255.0f,
+      clear_color_.a / 255.0f
+    };
+
+    if (ImGui::ColorEdit3("clear color", color)) {
+      clear_color_ = (Color){(unsigned char)(color[0] * 255),
+                             (unsigned char)(color[1] * 255),
+                             (unsigned char)(color[2] * 255),
+                             (unsigned char)(color[3] * 255)};
+    }
 
     if (ImGui::Button("Button"))  // Buttons return true when clicked
       counter++;
@@ -227,18 +217,17 @@ void GuiManager::renderMainWindows() {
 }
 
 void GuiManager::cleanup() {
-  if (window_ != nullptr) {
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+  // Shutdown ImGui context with rlImGui
+  rlImGuiShutdown();
 
-    glfwDestroyWindow(window_);
-    glfwTerminate();
-
-    window_ = nullptr;
-  }
+  // Close raylib window
+  CloseWindow();
 }
 
-void GuiManager::glfw_error_callback(int error, const char* description) {
-  fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+float GuiManager::scaleToDPI(float value) {
+  return GetWindowScaleDPI().x * value;
+}
+
+int GuiManager::scaleToDPI(int value) {
+  return int(GetWindowScaleDPI().x * value);
 }

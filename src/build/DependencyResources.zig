@@ -99,10 +99,24 @@ pub fn init(
         .renderer = cimgui.Renderer.OpenGL3,
     });
 
+    const raylib_dep = b.dependency("raylib", .{
+        .target = target,
+        .optimize = optimize,
+        .platform = .glfw,
+    });
+
     exe.addIncludePath(cli11_lib);
     exe.addIncludePath(tabulate_lib);
     exe.linkLibrary(fmt);
     exe.linkLibrary(cimgui_dep.artifact("cimgui"));
+    exe.linkLibrary(raylib_dep.artifact("raylib"));
+    // TODO: Use a dependency for this
+    exe.addCSourceFile(.{
+        .file = b.path("deps/lib/common/rlImGui.cpp"),
+        .flags = cppflags,
+    });
+    exe.addIncludePath(b.path("deps/lib/common"));
+    exe.addIncludePath(raylib_dep.path("src"));
 
     // Add dependency on all steps
     for (steps.items) |step| {

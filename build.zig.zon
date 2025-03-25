@@ -52,6 +52,10 @@
             .url = "git+https://github.com/hadronomy/cimgui.zig#81607199bc3b5517c0d98acdf224ffb1c205b0dc",
             .hash = "cimgui_zig-1.0.0-2XubknUmUwBJK-6_D4e7vo9BLJVmyY79mBMBiWnZSS10",
         },
+        .raylib = .{
+            .url = "git+https://github.com/raysan5/raylib#f5c96302d5623950dccdca31f8dd66d6d633dbd1",
+            .hash = "raylib-5.5.0-whq8uFV0zQA9NXxhpYFZk_yHW6xzg5eKGmOtMJ2DOTdU",
+        },
     },
     .paths = .{
         "build.zig",

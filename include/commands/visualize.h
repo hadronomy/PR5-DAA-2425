@@ -6,7 +6,6 @@
 
 #include "command_handler.h"
 #include "command_registry.h"
-#include "visualization/gui_manager.h"
 
 /**
  * Command handler for visualize command
@@ -26,17 +25,3 @@ class VisualizeCommand : public CommandHandler {
  private:
   std::string path_;
 };
-
-inline bool VisualizeCommand::execute() {
-  GuiManager gui;
-
-  if (!gui.initialize()) {
-    if (verbose_) {
-      fmt::print(stderr, "Failed to initialize GUI\n");
-    }
-    return false;
-  }
-
-  gui.run();
-  return true;
-}

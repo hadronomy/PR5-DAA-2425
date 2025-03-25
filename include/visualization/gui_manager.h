@@ -1,17 +1,12 @@
 #pragma once
 
-#include <string>
-#include <thread>
-
-// ImGui and OpenGL headers
-#include <GLFW/glfw3.h>
-#include "backends/imgui_impl_glfw.h"
-#include "backends/imgui_impl_opengl3.h"
+// Only include ImGui directly
 #include "imgui.h"
-#include "imgui_internal.h"
+
+#include "raylib.h"
 
 /**
- * Class to manage the ImGui visualization window and rendering
+ * Class to manage the ImGui visualization window and rendering using raylib
  */
 class GuiManager {
  public:
@@ -36,9 +31,9 @@ class GuiManager {
 
  private:
   // Window and rendering state
-  GLFWwindow* window_;
-  const char* glsl_version_;
-  ImVec4 clear_color_;
+  int screen_width_;
+  int screen_height_;
+  Color clear_color_;
 
   // UI state
   bool show_demo_window_;
@@ -48,7 +43,7 @@ class GuiManager {
 
   // Setup methods
   void setupImGui();
-  void setupDocking(const ImGuiViewport* viewport);
+  void setupDocking();
 
   // Rendering methods
   void renderMenuBar();
@@ -56,6 +51,7 @@ class GuiManager {
   void renderRightPanel();
   void renderMainWindows();
 
-  // Helper function for GLFW error callback
-  static void glfw_error_callback(int error, const char* description);
+  // Utility functions
+  float scaleToDPI(float value);
+  int scaleToDPI(int value);
 };

@@ -8,7 +8,7 @@
 #include "location.hh"
 
 // ANSI color codes
-enum Color {
+enum AnsiColor {
   RESET = 0,
   RED = 31,
   GREEN = 32,
@@ -81,7 +81,7 @@ class DiagnosticEngine {
   SourceManager& sources;
   bool use_colors = true;
 
-  std::string color(Color c) {
+  std::string color(AnsiColor c) {
     if (!use_colors)
       return "";
     return "\033[" + std::to_string(c) + "m";
