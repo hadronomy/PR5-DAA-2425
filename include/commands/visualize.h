@@ -116,7 +116,7 @@ inline bool VisualizeCommand::execute() {
     ImGui::PopStyleVar(3);
 
     // Submit the DockSpace
-    dockspace_id = ImGui::GetID("MyDockSpace");
+    dockspace_id = ImGui::GetID("MainWindowDockspace");
     ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
 
     // Initialize docking layout on first frame
