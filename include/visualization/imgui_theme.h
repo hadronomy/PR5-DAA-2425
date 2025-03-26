@@ -1,62 +1,80 @@
 #pragma once
 
-#include <functional>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 #include "imgui.h"
 
+class Theme {
+ public:
+  virtual ~Theme() = default;
+  virtual void Apply() const = 0;
+  virtual std::string GetName() const = 0;
+};
+
+class ComfortableDarkCyanTheme : public Theme {
+ public:
+  void Apply() const override;
+  std::string GetName() const override { return "Comfortable Dark Cyan"; }
+};
+
+class DefaultTheme : public Theme {
+ public:
+  void Apply() const override;
+  std::string GetName() const override { return "Default"; }
+};
+
+class FontManager {
+ public:
+  FontManager();
+  ~FontManager() = default;
+
+  bool Initialize();
+  bool LoadFont(const std::string& name, const std::string& path, float size);
+  void SetCurrentFont(const std::string& fontName);
+  ImFont* GetFont(const std::string& fontName) const;
+  bool IsInitialized() const { return initialized; }
+  const std::string& GetCurrentFontName() const { return currentFontName; }
+
+ private:
+  std::unordered_map<std::string, ImFont*> fonts;
+  std::string currentFontName;
+  bool initialized;
+};
+
 class ImGuiThemeManager {
  public:
-  enum class ThemeType { ComfortableDarkCyan, Default };
+  static ImGuiThemeManager& GetInstance();
 
+  // Delete copy and move constructors/assignments
+  ImGuiThemeManager(const ImGuiThemeManager&) = delete;
+  ImGuiThemeManager& operator=(const ImGuiThemeManager&) = delete;
+  ImGuiThemeManager(ImGuiThemeManager&&) = delete;
+  ImGuiThemeManager& operator=(ImGuiThemeManager&&) = delete;
+
+  void RegisterTheme(std::unique_ptr<Theme> theme);
+  bool ApplyTheme(const std::string& themeName);
+  std::vector<std::string> GetAvailableThemes() const;
+  std::string GetCurrentThemeName() const;
+
+  // Font management
+  void InitializeFonts();
+  void SetFont(const std::string& fontName);
+  void SetDefaultFont(float size = 16.0f);
+  ImFont* GetFont(const std::string& fontName) const;
+
+ private:
+  // Private constructor for singleton
   ImGuiThemeManager();
   ~ImGuiThemeManager() = default;
 
-  // Apply a specific theme by enum type
-  void ApplyTheme(ThemeType theme);
-
-  // Apply a theme by name
-  bool ApplyThemeByName(const std::string& themeName);
-
-  // Get list of available theme names
-  std::vector<std::string> GetAvailableThemes() const;
-
-  // Get the current theme type
-  ThemeType GetCurrentTheme() const { return currentTheme; }
-
-  // Get the current theme name
-  std::string GetCurrentThemeName() const;
-
-  // Font management methods
-  bool LoadFonts();
-  void SetDefaultFont(float size = 16.0f);
-  void SetFont(const std::string& fontName);
-  ImFont* GetFont(const std::string& fontName);
-
-  // Initialize fonts (called once during application startup)
-  void InitializeFonts();
-
- private:
-  // Theme functions
-  static void ApplyComfortableDarkCyanTheme();
-  static void ApplyDefaultTheme();
-
-  // Map theme types to their implementation functions
-  using ThemeFunc = std::function<void()>;
-  std::unordered_map<ThemeType, ThemeFunc> themeMap;
-
-  // Map theme names to their enum types for lookup
-  std::unordered_map<std::string, ThemeType> themeNameMap;
-
-  // Font storage
-  std::unordered_map<std::string, ImFont*> fonts;
-  bool fontsLoaded;
-  std::string currentFontName;
-
-  // Current theme
-  ThemeType currentTheme;
+  std::unordered_map<std::string, std::unique_ptr<Theme>> themes;
+  std::string currentThemeName;
+  FontManager fontManager;
 };
 
-// Global instance for easier access
-extern ImGuiThemeManager g_ImGuiThemeManager;
+// Global instance accessor function
+inline ImGuiThemeManager& GetThemeManager() {
+  return ImGuiThemeManager::GetInstance();
+}

@@ -13,6 +13,7 @@ class UIComponents {
   void RenderLeftPanel();
   void RenderRightPanel();
   void RenderMainWindows();
+  void RenderThemeSelector();
 
   // State getters/setters
   bool& ShowDemoWindow() { return show_demo_window_; }

@@ -1,62 +1,9 @@
 #include "visualization/imgui_theme.h"
+#include <iostream>
 #include <vector>
 
-// Initialize global instance
-ImGuiThemeManager g_ImGuiThemeManager;
-
-ImGuiThemeManager::ImGuiThemeManager()
-    : currentTheme(ThemeType::Default), fontsLoaded(false), currentFontName("Default") {
-  // Initialize the theme function map
-  themeMap[ThemeType::ComfortableDarkCyan] = &ApplyComfortableDarkCyanTheme;
-  themeMap[ThemeType::Default] = &ApplyDefaultTheme;
-
-  // Initialize theme name map
-  themeNameMap["Comfortable Dark Cyan"] = ThemeType::ComfortableDarkCyan;
-  themeNameMap["Default"] = ThemeType::Default;
-}
-
-void ImGuiThemeManager::ApplyTheme(ThemeType theme) {
-  if (themeMap.find(theme) != themeMap.end()) {
-    // Make sure ImGui context exists before trying to apply theme
-    if (ImGui::GetCurrentContext() != nullptr) {
-      themeMap[theme]();
-      currentTheme = theme;
-
-      // If we have fonts loaded, ensure the current font is applied
-      if (fontsLoaded && !currentFontName.empty()) {
-        SetFont(currentFontName);
-      }
-    }
-  }
-}
-
-bool ImGuiThemeManager::ApplyThemeByName(const std::string& themeName) {
-  auto it = themeNameMap.find(themeName);
-  if (it != themeNameMap.end()) {
-    ApplyTheme(it->second);
-    return true;
-  }
-  return false;
-}
-
-std::vector<std::string> ImGuiThemeManager::GetAvailableThemes() const {
-  std::vector<std::string> result;
-  for (const auto& pair : themeNameMap) {
-    result.push_back(pair.first);
-  }
-  return result;
-}
-
-std::string ImGuiThemeManager::GetCurrentThemeName() const {
-  for (const auto& pair : themeNameMap) {
-    if (pair.second == currentTheme) {
-      return pair.first;
-    }
-  }
-  return "Unknown";
-}
-
-void ImGuiThemeManager::ApplyComfortableDarkCyanTheme() {
+// Theme implementations
+void ComfortableDarkCyanTheme::Apply() const {
   // Comfortable Dark Cyan style by SouthCraftX from ImThemes
   ImGuiStyle& style = ImGui::GetStyle();
 
@@ -195,7 +142,7 @@ void ImGuiThemeManager::ApplyComfortableDarkCyanTheme() {
   style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.0f, 0.2f, 0.2f, 0.501960813999176f);
 }
 
-void ImGuiThemeManager::ApplyDefaultTheme() {
+void DefaultTheme::Apply() const {
   // Apply classic style first
   ImGui::StyleColorsClassic();
 
@@ -223,9 +170,11 @@ void ImGuiThemeManager::ApplyDefaultTheme() {
   style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
 }
 
-bool ImGuiThemeManager::LoadFonts() {
-  // Skip if already loaded
-  if (fontsLoaded)
+// FontManager implementation
+FontManager::FontManager() : currentFontName("Default"), initialized(false) {}
+
+bool FontManager::Initialize() {
+  if (initialized)
     return true;
 
   ImGuiIO& io = ImGui::GetIO();
@@ -238,36 +187,56 @@ bool ImGuiThemeManager::LoadFonts() {
   ImFontConfig config;
   config.MergeMode = false;
 
+  bool success = true;
+
   // Load a regular sans-serif font
-  fonts["Geist"] = io.Fonts->AddFontFromFileTTF("assets/fonts/Geist-Regular.ttf", 16.0f, &config);
+  ImFont* geistFont =
+    io.Fonts->AddFontFromFileTTF("assets/fonts/Geist-Regular.ttf", 16.0f, &config);
+  fonts["Geist"] = geistFont ? geistFont : fonts["Default"];
+  success = success && (geistFont != nullptr);
 
   // Load a monospace font for code
-  fonts["Geist Mono"] =
+  ImFont* geistMonoFont =
     io.Fonts->AddFontFromFileTTF("assets/fonts/GeistMono-Regular.otf", 16.0f, &config);
-
-  // Check if any fonts failed to load (fall back to default)
-  if (fonts["Geist"] == nullptr)
-    fonts["Geist"] = fonts["Default"];
-  if (fonts["Geist Mono"] == nullptr)
-    fonts["Geist Mono"] = fonts["Default"];
+  fonts["Geist Mono"] = geistMonoFont ? geistMonoFont : fonts["Default"];
+  success = success && (geistMonoFont != nullptr);
 
   // Build font atlas
   io.Fonts->Build();
-  fontsLoaded = true;
+  initialized = true;
 
   // Set default font
-  SetDefaultFont();
+  SetCurrentFont("Geist Mono");
+
+  return success;
+}
+
+bool FontManager::LoadFont(const std::string& name, const std::string& path, float size) {
+  if (!initialized) {
+    if (!Initialize())
+      return false;
+  }
+
+  ImGuiIO& io = ImGui::GetIO();
+  ImFontConfig config;
+  config.MergeMode = false;
+
+  ImFont* font = io.Fonts->AddFontFromFileTTF(path.c_str(), size, &config);
+  if (font == nullptr) {
+    std::cerr << "Failed to load font: " << path << std::endl;
+    return false;
+  }
+
+  fonts[name] = font;
+  io.Fonts->Build();
 
   return true;
 }
 
-void ImGuiThemeManager::SetDefaultFont(float size) {
-  SetFont("Geist Mono");
-}
-
-void ImGuiThemeManager::SetFont(const std::string& fontName) {
-  if (!fontsLoaded) {
-    LoadFonts();
+void FontManager::SetCurrentFont(const std::string& fontName) {
+  if (!initialized) {
+    if (!Initialize())
+      return;
   }
 
   auto it = fonts.find(fontName);
@@ -275,25 +244,87 @@ void ImGuiThemeManager::SetFont(const std::string& fontName) {
     ImGuiIO& io = ImGui::GetIO();
     io.FontDefault = it->second;
     currentFontName = fontName;
+  } else {
+    std::cerr << "Font not found: " << fontName << std::endl;
   }
 }
 
-ImFont* ImGuiThemeManager::GetFont(const std::string& fontName) {
-  if (!fontsLoaded) {
-    LoadFonts();
-  }
-
+ImFont* FontManager::GetFont(const std::string& fontName) const {
   auto it = fonts.find(fontName);
   if (it != fonts.end()) {
     return it->second;
   }
 
-  return fonts["Default"];
+  auto defaultIt = fonts.find("Default");
+  if (defaultIt != fonts.end()) {
+    return defaultIt->second;
+  }
+
+  return nullptr;
+}
+
+// ImGuiThemeManager implementation
+ImGuiThemeManager& ImGuiThemeManager::GetInstance() {
+  static ImGuiThemeManager instance;
+  return instance;
+}
+
+ImGuiThemeManager::ImGuiThemeManager() : currentThemeName("Default") {
+  // Register default themes
+  RegisterTheme(std::make_unique<ComfortableDarkCyanTheme>());
+  RegisterTheme(std::make_unique<DefaultTheme>());
+}
+
+void ImGuiThemeManager::RegisterTheme(std::unique_ptr<Theme> theme) {
+  if (theme) {
+    std::string name = theme->GetName();
+    themes[name] = std::move(theme);
+  }
+}
+
+bool ImGuiThemeManager::ApplyTheme(const std::string& themeName) {
+  auto it = themes.find(themeName);
+  if (it != themes.end()) {
+    // Make sure ImGui context exists before trying to apply theme
+    if (ImGui::GetCurrentContext() != nullptr) {
+      it->second->Apply();
+      currentThemeName = themeName;
+
+      // Ensure the current font is applied
+      if (fontManager.IsInitialized()) {
+        SetFont(fontManager.GetCurrentFontName());
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
+std::vector<std::string> ImGuiThemeManager::GetAvailableThemes() const {
+  std::vector<std::string> result;
+  result.reserve(themes.size());
+  for (const auto& pair : themes) {
+    result.push_back(pair.first);
+  }
+  return result;
+}
+
+std::string ImGuiThemeManager::GetCurrentThemeName() const {
+  return currentThemeName;
 }
 
 void ImGuiThemeManager::InitializeFonts() {
-  // This should be called once during application startup
-  if (!fontsLoaded) {
-    LoadFonts();
-  }
+  fontManager.Initialize();
+}
+
+void ImGuiThemeManager::SetFont(const std::string& fontName) {
+  fontManager.SetCurrentFont(fontName);
+}
+
+void ImGuiThemeManager::SetDefaultFont(float size) {
+  fontManager.SetCurrentFont("Geist Mono");
+}
+
+ImFont* ImGuiThemeManager::GetFont(const std::string& fontName) const {
+  return fontManager.GetFont(fontName);
 }

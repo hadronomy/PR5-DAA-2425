@@ -114,19 +114,7 @@ void UIComponents::RenderMainWindows() {
     ImGui::Text("counter = %d", counter);
 
     // Theme selection UI
-    if (ImGui::BeginCombo("Theme", g_ImGuiThemeManager.GetCurrentThemeName().c_str())) {
-      auto themes = g_ImGuiThemeManager.GetAvailableThemes();
-      for (const auto& theme : themes) {
-        bool is_selected = (g_ImGuiThemeManager.GetCurrentThemeName() == theme);
-        if (ImGui::Selectable(theme.c_str(), is_selected)) {
-          g_ImGuiThemeManager.ApplyThemeByName(theme);
-        }
-        if (is_selected) {
-          ImGui::SetItemDefaultFocus();
-        }
-      }
-      ImGui::EndCombo();
-    }
+    RenderThemeSelector();
 
     ImGui::End();
   }
@@ -167,5 +155,21 @@ void UIComponents::RenderMainWindows() {
     }
 
     ImGui::End();
+  }
+}
+
+void UIComponents::RenderThemeSelector() {
+  if (ImGui::BeginCombo("Theme", GetThemeManager().GetCurrentThemeName().c_str())) {
+    auto themes = GetThemeManager().GetAvailableThemes();
+    for (const auto& theme : themes) {
+      bool is_selected = (GetThemeManager().GetCurrentThemeName() == theme);
+      if (ImGui::Selectable(theme.c_str(), is_selected)) {
+        GetThemeManager().ApplyTheme(theme);
+      }
+      if (is_selected) {
+        ImGui::SetItemDefaultFocus();
+      }
+    }
+    ImGui::EndCombo();
   }
 }

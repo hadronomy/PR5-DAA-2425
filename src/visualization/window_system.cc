@@ -21,7 +21,7 @@ bool WindowSystem::Initialize(int width, int height, const char* title) {
   rlImGuiSetup(true);
 
   // Initialize fonts before applying theme
-  g_ImGuiThemeManager.InitializeFonts();
+  GetThemeManager().InitializeFonts();
 
   // Apply our theme immediately after ImGui is set up
   ConfigureImGuiStyle();
@@ -96,5 +96,5 @@ void WindowSystem::SetupDocking() {
 // Rename to avoid conflict with global function
 void WindowSystem::ConfigureImGuiStyle() {
   // Use our theme manager to apply the Comfortable Dark Cyan theme
-  g_ImGuiThemeManager.ApplyTheme(ImGuiThemeManager::ThemeType::ComfortableDarkCyan);
+  GetThemeManager().ApplyTheme("Comfortable Dark Cyan");
 }
