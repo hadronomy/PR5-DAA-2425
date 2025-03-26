@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 #include <unordered_map>
+#include <vector>
 #include "imgui.h"
 
 class ImGuiThemeManager {
@@ -27,6 +28,15 @@ class ImGuiThemeManager {
   // Get the current theme name
   std::string GetCurrentThemeName() const;
 
+  // Font management methods
+  bool LoadFonts();
+  void SetDefaultFont(float size = 16.0f);
+  void SetFont(const std::string& fontName);
+  ImFont* GetFont(const std::string& fontName);
+
+  // Initialize fonts (called once during application startup)
+  void InitializeFonts();
+
  private:
   // Theme functions
   static void ApplyComfortableDarkCyanTheme();
@@ -38,6 +48,11 @@ class ImGuiThemeManager {
 
   // Map theme names to their enum types for lookup
   std::unordered_map<std::string, ThemeType> themeNameMap;
+
+  // Font storage
+  std::unordered_map<std::string, ImFont*> fonts;
+  bool fontsLoaded;
+  std::string currentFontName;
 
   // Current theme
   ThemeType currentTheme;

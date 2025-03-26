@@ -4,7 +4,8 @@
 // Initialize global instance
 ImGuiThemeManager g_ImGuiThemeManager;
 
-ImGuiThemeManager::ImGuiThemeManager() : currentTheme(ThemeType::Default) {
+ImGuiThemeManager::ImGuiThemeManager()
+    : currentTheme(ThemeType::Default), fontsLoaded(false), currentFontName("Default") {
   // Initialize the theme function map
   themeMap[ThemeType::ComfortableDarkCyan] = &ApplyComfortableDarkCyanTheme;
   themeMap[ThemeType::Default] = &ApplyDefaultTheme;
@@ -20,6 +21,11 @@ void ImGuiThemeManager::ApplyTheme(ThemeType theme) {
     if (ImGui::GetCurrentContext() != nullptr) {
       themeMap[theme]();
       currentTheme = theme;
+
+      // If we have fonts loaded, ensure the current font is applied
+      if (fontsLoaded && !currentFontName.empty()) {
+        SetFont(currentFontName);
+      }
     }
   }
 }
@@ -215,4 +221,79 @@ void ImGuiThemeManager::ApplyDefaultTheme() {
   style.GrabMinSize = 5.0f;
   style.ScrollbarSize = 12.0f;
   style.WindowTitleAlign = ImVec2(0.5f, 0.5f);
+}
+
+bool ImGuiThemeManager::LoadFonts() {
+  // Skip if already loaded
+  if (fontsLoaded)
+    return true;
+
+  ImGuiIO& io = ImGui::GetIO();
+
+  // Store default font
+  fonts["Default"] = io.Fonts->AddFontDefault();
+
+  // Load additional fonts
+  // Note: Paths are relative to the application directory
+  ImFontConfig config;
+  config.MergeMode = false;
+
+  // Load a regular sans-serif font
+  fonts["Geist"] = io.Fonts->AddFontFromFileTTF("assets/fonts/Geist-Regular.ttf", 16.0f, &config);
+
+  // Load a monospace font for code
+  fonts["Geist Mono"] =
+    io.Fonts->AddFontFromFileTTF("assets/fonts/GeistMono-Regular.otf", 16.0f, &config);
+
+  // Check if any fonts failed to load (fall back to default)
+  if (fonts["Geist"] == nullptr)
+    fonts["Geist"] = fonts["Default"];
+  if (fonts["Geist Mono"] == nullptr)
+    fonts["Geist Mono"] = fonts["Default"];
+
+  // Build font atlas
+  io.Fonts->Build();
+  fontsLoaded = true;
+
+  // Set default font
+  SetDefaultFont();
+
+  return true;
+}
+
+void ImGuiThemeManager::SetDefaultFont(float size) {
+  SetFont("Geist Mono");
+}
+
+void ImGuiThemeManager::SetFont(const std::string& fontName) {
+  if (!fontsLoaded) {
+    LoadFonts();
+  }
+
+  auto it = fonts.find(fontName);
+  if (it != fonts.end() && it->second != nullptr) {
+    ImGuiIO& io = ImGui::GetIO();
+    io.FontDefault = it->second;
+    currentFontName = fontName;
+  }
+}
+
+ImFont* ImGuiThemeManager::GetFont(const std::string& fontName) {
+  if (!fontsLoaded) {
+    LoadFonts();
+  }
+
+  auto it = fonts.find(fontName);
+  if (it != fonts.end()) {
+    return it->second;
+  }
+
+  return fonts["Default"];
+}
+
+void ImGuiThemeManager::InitializeFonts() {
+  // This should be called once during application startup
+  if (!fontsLoaded) {
+    LoadFonts();
+  }
 }

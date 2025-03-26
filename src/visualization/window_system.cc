@@ -20,6 +20,9 @@ bool WindowSystem::Initialize(int width, int height, const char* title) {
   // Initialize ImGui
   rlImGuiSetup(true);
 
+  // Initialize fonts before applying theme
+  g_ImGuiThemeManager.InitializeFonts();
+
   // Apply our theme immediately after ImGui is set up
   ConfigureImGuiStyle();
 

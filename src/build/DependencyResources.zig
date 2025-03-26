@@ -124,6 +124,12 @@ pub fn init(
         .install_subdir = "resources",
     });
 
+    b.installDirectory(.{
+        .source_dir = b.path("assets"),
+        .install_dir = .bin,
+        .install_subdir = "assets",
+    });
+
     // Add dependency on all steps
     for (steps.items) |step| {
         exe.step.dependOn(step);
