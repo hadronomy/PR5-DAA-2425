@@ -206,7 +206,7 @@ bool FontManager::Initialize() {
   initialized = true;
 
   // Set default font
-  SetCurrentFont("Geist Mono");
+  SetCurrentFont("Geist");
 
   return success;
 }
