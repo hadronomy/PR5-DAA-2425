@@ -133,8 +133,7 @@ void ComfortableDarkCyanTheme::Apply() const {
     ImVec4(0.1176470592617989f, 0.1333333402872086f, 0.1490196138620377f, 1.0f);
   style.Colors[ImGuiCol_TableRowBgAlt] =
     ImVec4(0.09803921729326248f, 0.105882354080677f, 0.1215686276555061f, 1.0f);
-  style.Colors[ImGuiCol_TextSelectedBg] =
-    ImVec4(0.9372549057006836f, 0.9372549057006836f, 0.9372549057006836f, 1.0f);
+  style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.3f, 0.4f, 0.5f, 0.5f);
   style.Colors[ImGuiCol_DragDropTarget] = lightGray;
   style.Colors[ImGuiCol_NavHighlight] = mediumGray;
   style.Colors[ImGuiCol_NavWindowingHighlight] = lightGray;
