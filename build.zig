@@ -3,6 +3,7 @@ const builtin = @import("builtin");
 
 const buildpkg = @import("src/build/main.zig");
 const config = buildpkg.config;
+const utils = buildpkg.utils;
 
 // TODO: Improve upon this
 // sources:
@@ -72,7 +73,7 @@ pub fn build(b: *std.Build) !void {
     );
 
     // Add source files to the executable
-    const sources = try findFilesRecursive(b, "src", &config.cfiles_exts);
+    const sources = try utils.findFilesRecursive(b, "src", &config.cfiles_exts);
     var all_sources = std.ArrayList([]const u8).init(b.allocator);
     try all_sources.appendSlice(sources);
 
@@ -81,6 +82,7 @@ pub fn build(b: *std.Build) !void {
         .files = all_sources.items,
         .flags = &config.cppflags,
     });
+    _ = try exe.step.addDirectoryWatchInput(b.path("src"));
 
     // Add specific steps to run just flex or bison
     generate_step.dependOn(parser_resources.step);
@@ -112,25 +114,4 @@ fn linkGlfw(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Build.Resol
         exe.linkSystemLibrary("gl");
         exe.linkSystemLibrary("glfw");
     }
-}
-
-fn findFilesRecursive(b: *std.Build, dir_name: []const u8, exts: []const []const u8) ![][]const u8 {
-    var sources = std.ArrayList([]const u8).init(b.allocator);
-
-    var dir = try b.build_root.handle.openDir(dir_name, .{ .iterate = true });
-    var walker = try dir.walk(b.allocator);
-    defer walker.deinit();
-    while (try walker.next()) |entry| {
-        const ext = std.fs.path.extension(entry.basename);
-        const include_file = for (exts) |e| {
-            if (std.mem.eql(u8, ext, e)) {
-                break true;
-            }
-        } else false;
-        if (include_file) {
-            try sources.append(b.fmt("{s}/{s}", .{ dir_name, entry.path }));
-        }
-    }
-
-    return sources.items;
 }

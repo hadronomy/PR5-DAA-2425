@@ -67,7 +67,7 @@ pub fn init(
     );
 
     // Find FMT source files
-    const fmt_source_files = try findDependencyFiles(
+    const fmt_source_files = try utils.findDependencyFiles(
         b,
         fmt_src.path("./src"),
         &[_][]const u8{ ".c", ".cpp", ".cxx", ".c++", ".cc" },
@@ -118,6 +118,12 @@ pub fn init(
     exe.addIncludePath(b.path("deps/lib/common"));
     exe.addIncludePath(raylib_dep.path("src"));
 
+    b.installDirectory(.{
+        .source_dir = b.path("resources"),
+        .install_dir = .bin,
+        .install_subdir = "resources",
+    });
+
     // Add dependency on all steps
     for (steps.items) |step| {
         exe.step.dependOn(step);
@@ -126,39 +132,4 @@ pub fn init(
     return .{
         .steps = steps.items,
     };
-}
-
-fn findDependencyFiles(b: *Build, dep_path: Build.LazyPath, exts: []const []const u8) ![]const Build.LazyPath {
-    var sources = std.ArrayList(Build.LazyPath).init(b.allocator);
-    const abs_path = dep_path.getPath(b);
-
-    // Check if the path exists
-    var dir = std.fs.cwd().openDir(abs_path, .{ .iterate = true }) catch |err| {
-        std.debug.print("Error opening dependency directory '{s}': {any}\n", .{ abs_path, err });
-        return error.DependencyPathNotFound;
-    };
-    defer dir.close();
-
-    var walker = try dir.walk(b.allocator);
-    defer walker.deinit();
-
-    while (try walker.next()) |entry| {
-        if (entry.kind != .file) continue;
-
-        const ext = std.fs.path.extension(entry.basename);
-        const include_file = for (exts) |e| {
-            if (std.mem.eql(u8, ext, e)) {
-                break true;
-            }
-        } else false;
-
-        if (include_file) {
-            // The path field already contains the relative path from the root directory
-            // Just use it directly to create a LazyPath
-            const file_path = dep_path.path(b, entry.path);
-            try sources.append(file_path);
-        }
-    }
-
-    return sources.items;
 }

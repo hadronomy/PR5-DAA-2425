@@ -1,18 +1,18 @@
 #include "commands/visualize.h"
 
-#include "visualization/gui_manager.h"
+#include "visualization/application.h"
 
 bool VisualizeCommand::execute() {
-  GuiManager gui;
+  VisApplication gui;
 
-  if (!gui.initialize()) {
+  if (!gui.Initialize()) {
     if (verbose_) {
       fmt::print(stderr, "Failed to initialize GUI\n");
     }
     return false;
   }
 
-  gui.run();
+  gui.Run();
   return true;
 }
 
