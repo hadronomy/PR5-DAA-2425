@@ -15,7 +15,7 @@ Canvas::Canvas(int width, int height, ObjectManager* object_manager)
   // Initialize camera directly
   camera_.zoom = 1.0f;
   camera_.target = Vector2{0.0f, 0.0f};
-  camera_.offset = Vector2{0.0f, 0.0f};
+  camera_.offset = Vector2{width / 2.0f, height / 2.0f};
   camera_.rotation = 0.0f;
 
   // Initialize render texture with MSAA
@@ -348,7 +348,7 @@ void Canvas::RenderWindow() {
       // Add camera control buttons for precise adjustments
       if (ImGui::Button("Reset Camera")) {
         camera_.target = Vector2{0, 0};
-        camera_.offset = Vector2{0, 0};
+        camera_.offset = Vector2{width_ / 2.0f, height_ / 2.0f};
         camera_.zoom = 1.0f;
         Update();
       }
@@ -357,7 +357,7 @@ void Canvas::RenderWindow() {
 
       if (ImGui::Button("Center Origin")) {
         camera_.target = Vector2{0, 0};
-        camera_.offset = Vector2{0, 0};
+        camera_.offset = Vector2{width_ / 2.0f, height_ / 2.0f};
         Update();
       }
     }

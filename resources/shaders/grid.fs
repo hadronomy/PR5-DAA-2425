@@ -116,7 +116,7 @@ vec4 renderGrid(vec2 worldPos) {
 
 vec2 fragmentToWorldPos(vec2 fragCoord) {
     // Convert from fragment coordinates to centered screen coordinates
-    vec2 screenPos = fragCoord - vec2(0, resolution.y);
+    vec2 screenPos = fragCoord - resolution * 0.5;
     
     // Apply camera transformations:
     // 1. Convert to world space by dividing by zoom (scale)
