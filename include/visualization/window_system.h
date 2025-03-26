@@ -11,15 +11,11 @@ class WindowSystem {
   void BeginFrame();
   void EndFrame();
   bool ShouldClose() const;
-  void SetupDocking();
-
-  int GetScreenWidth() const { return GetScreenWidth(); }
-  int GetScreenHeight() const { return GetScreenHeight(); }
 
  private:
+  void SetupDocking();
+  void ConfigureImGuiStyle();  // This is a member function now
+
   bool first_frame_;
   ImGuiID dockspace_id_;
-
-  void ConfigureImGuiStyle();
-  void ConfigureDockSpace();
 };

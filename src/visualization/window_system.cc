@@ -1,6 +1,7 @@
 #include "visualization/window_system.h"
 #include "imgui_internal.h"
 #include "rlImGui.h"
+#include "visualization/imgui_theme.h"
 
 WindowSystem::WindowSystem() : first_frame_(true), dockspace_id_(0) {}
 
@@ -16,6 +17,12 @@ bool WindowSystem::Initialize(int width, int height, const char* title) {
   // Set target framerate
   SetTargetFPS(60);
 
+  // Initialize ImGui
+  rlImGuiSetup(true);
+
+  // Apply our theme immediately after ImGui is set up
+  ConfigureImGuiStyle();
+
   return true;
 }
 
@@ -25,6 +32,11 @@ void WindowSystem::BeginFrame() {
 
   // Begin ImGui frame
   rlImGuiBegin();
+
+  // Ensure theme is consistently applied at the start of each frame
+  if (first_frame_ || ImGui::GetCurrentContext()->FrameCount == 1) {
+    ConfigureImGuiStyle();  // Apply theme again on first real frame
+  }
 
   // Setup docking on first frame
   if (first_frame_) {
@@ -76,4 +88,10 @@ void WindowSystem::SetupDocking() {
 
   ImGui::DockBuilderFinish(dockspace_id_);
 #endif
+}
+
+// Rename to avoid conflict with global function
+void WindowSystem::ConfigureImGuiStyle() {
+  // Use our theme manager to apply the Comfortable Dark Cyan theme
+  g_ImGuiThemeManager.ApplyTheme(ImGuiThemeManager::ThemeType::ComfortableDarkCyan);
 }

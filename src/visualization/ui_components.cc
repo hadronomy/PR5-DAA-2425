@@ -1,5 +1,6 @@
 #include "visualization/ui_components.h"
 #include "imgui.h"
+#include "visualization/imgui_theme.h"
 
 UIComponents::UIComponents(ObjectManager* object_manager, Canvas* canvas)
     : object_manager_(object_manager),
@@ -111,6 +112,21 @@ void UIComponents::RenderMainWindows() {
 
     ImGui::SameLine();
     ImGui::Text("counter = %d", counter);
+
+    // Theme selection UI
+    if (ImGui::BeginCombo("Theme", g_ImGuiThemeManager.GetCurrentThemeName().c_str())) {
+      auto themes = g_ImGuiThemeManager.GetAvailableThemes();
+      for (const auto& theme : themes) {
+        bool is_selected = (g_ImGuiThemeManager.GetCurrentThemeName() == theme);
+        if (ImGui::Selectable(theme.c_str(), is_selected)) {
+          g_ImGuiThemeManager.ApplyThemeByName(theme);
+        }
+        if (is_selected) {
+          ImGui::SetItemDefaultFocus();
+        }
+      }
+      ImGui::EndCombo();
+    }
 
     ImGui::End();
   }
