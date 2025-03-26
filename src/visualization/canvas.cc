@@ -15,7 +15,7 @@ Canvas::Canvas(int width, int height, ObjectManager* object_manager)
   // Initialize camera directly
   camera_.zoom = 1.0f;
   camera_.target = Vector2{0.0f, 0.0f};
-  camera_.offset = Vector2{width / 2.0f, height / 2.0f};
+  camera_.offset = Vector2{width_ / 2.0f, height_ / 2.0f};
   camera_.rotation = 0.0f;
 
   // Initialize render texture with MSAA
@@ -46,13 +46,15 @@ Canvas::Canvas(int width, int height, ObjectManager* object_manager)
   shader_debug_mode_loc_ = GetShaderLocation(grid_shader_, "debugMode");
   shader_debug_param_loc_ = GetShaderLocation(grid_shader_, "debugParam");
 
-  // Set initial shader values
-  float resolution[2] = {(float)width, (float)height};
+  // Set initial shader values based on camera parameters
+  float resolution[2] = {(float)width_, (float)height_};
   SetShaderValue(grid_shader_, grid_resolution_loc_, resolution, SHADER_UNIFORM_VEC2);
 
+  // Use camera zoom directly for scale
   SetShaderValue(grid_shader_, grid_scale_loc_, &camera_.zoom, SHADER_UNIFORM_FLOAT);
 
-  float grid_offset[2] = {0.0f, 0.0f};
+  // Use camera target for grid offset
+  float grid_offset[2] = {camera_.target.x, camera_.target.y};
   SetShaderValue(grid_shader_, grid_offset_loc_, grid_offset, SHADER_UNIFORM_VEC2);
 
   Color grid_color = ColorAlpha(LIGHTGRAY, 0.4f);
@@ -78,7 +80,7 @@ Canvas::Canvas(int width, int height, ObjectManager* object_manager)
   SetShaderValue(grid_shader_, shader_debug_mode_loc_, &debug_mode, SHADER_UNIFORM_INT);
   SetShaderValue(grid_shader_, shader_debug_param_loc_, &shader_debug_param_, SHADER_UNIFORM_FLOAT);
 
-  // Force first update
+  // Force first update to ensure all values are properly synchronized
   Update();
 }
 
@@ -93,6 +95,10 @@ void Canvas::Resize(int width, int height) {
     height_ = height;
     UnloadRenderTexture(render_texture_);
     render_texture_ = LoadRenderTexture(width, height);
+
+    // Update camera offset when window is resized to maintain center positioning
+    camera_.offset = Vector2{width_ / 2.0f, height_ / 2.0f};
+
     needs_update_ = true;
   }
 }
@@ -302,7 +308,8 @@ void Canvas::RenderWindow() {
     ImGui::GetIO().WantCaptureKeyboard = true;
   }
 
-  // Always render the canvas every frame
+  // Always update and render the canvas every frame
+  Update();
   Render();
 
   // Draw the render texture to fill the entire content area
