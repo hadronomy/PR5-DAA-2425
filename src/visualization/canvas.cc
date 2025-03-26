@@ -316,14 +316,20 @@ void Canvas::RenderWindow() {
     }
 
     if (shader_debug_mode_) {
-      if (ImGui::SliderFloat("Debug Parameter", &shader_debug_param_, 0.1f, 10.0f)) {
-        // Update was triggered by slider
+      // Debug parameter dropdown
+      const char* items[] = {"0.1", "0.5", "1.0", "2.0", "5.0", "10.0"};
+      static float values[] = {0.1f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f};
+      static int current_item = 2;
+
+      if (ImGui::Combo("Debug Parameter", &current_item, items, IM_ARRAYSIZE(items))) {
+        shader_debug_param_ = values[current_item];
+        // Update was triggered by dropdown
         Update();
       }
 
       ImGui::Text("Debug Controls:");
       ImGui::Text("- Shows different grid aspects based on debug mode");
-      ImGui::Text("- Adjust parameter to fine-tune visualization");
+      ImGui::Text("- Select parameter to fine-tune visualization");
     }
 
     // Add camera information section
@@ -362,9 +368,9 @@ void Canvas::RenderWindow() {
       }
     }
 
-    ImGui::End();
+    ImGui::End();  // End of "Canvas Debug" window
   }
 
-  ImGui::End();
+  ImGui::End();  // End of "Canvas" window
   ImGui::PopStyleVar();
 }
