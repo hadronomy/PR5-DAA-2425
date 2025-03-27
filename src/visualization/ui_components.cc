@@ -76,62 +76,6 @@ void UIComponents::RenderRightPanel() {
 }
 
 void UIComponents::RenderMainWindows() {
-  // 1. Show ImGui demo window
-  if (show_demo_window_) {
-    ImGui::ShowDemoWindow(&show_demo_window_);
-  }
-
-  // 2. Show a simple window
-  {
-    static float f = 0.0f;
-    static int counter = 0;
-
-    ImGui::Begin("Hello, world!");
-    ImGui::Text("This is some useful text.");
-    ImGui::Checkbox("Demo Window", &show_demo_window_);
-    ImGui::Checkbox("Another Window", &show_another_window_);
-    ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-
-    float color[4] = {
-      clear_color_.r / 255.0f,
-      clear_color_.g / 255.0f,
-      clear_color_.b / 255.0f,
-      clear_color_.a / 255.0f
-    };
-
-    if (ImGui::ColorEdit3("clear color", color)) {
-      clear_color_ = (Color){(unsigned char)(color[0] * 255),
-                             (unsigned char)(color[1] * 255),
-                             (unsigned char)(color[2] * 255),
-                             (unsigned char)(color[3] * 255)};
-    }
-
-    if (ImGui::Button("Button")) {
-      counter++;
-    }
-
-    ImGui::SameLine();
-    ImGui::Text("counter = %d", counter);
-
-    // Theme selection UI
-    RenderThemeSelector();
-
-    ImGui::End();
-  }
-
-  // 3. Show another window
-  if (show_another_window_) {
-    ImGui::Begin("Another Window", &show_another_window_);
-    ImGui::Text("Hello from another window!");
-
-    if (ImGui::Button("Close Me")) {
-      show_another_window_ = false;
-    }
-
-    ImGui::End();
-  }
-
-  // Show shader debug window
   if (show_shader_debug_ && canvas_) {
     ImGui::Begin("Shader Debug", &show_shader_debug_);
 

@@ -1039,6 +1039,3 @@ out.txt
 .zig-cache
 zig-out
 !src/build
-
-# imgui
-imgui.ini

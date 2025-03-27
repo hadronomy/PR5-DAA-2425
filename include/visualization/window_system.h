@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include "imgui.h"
 
 class WindowSystem {
@@ -11,11 +12,16 @@ class WindowSystem {
   void BeginFrame();
   void EndFrame();
   bool ShouldClose() const;
+  void FocusWindowByName(const char* window_name);
 
  private:
   void SetupDocking();
-  void ConfigureImGuiStyle();  // This is a member function now
+  void ConfigureImGuiStyle();
+  void CreateDockspace();
+  bool LoadDockingState();
+  void SaveDockingState();
 
   bool first_frame_;
   ImGuiID dockspace_id_;
+  std::string ini_filename_;
 };
