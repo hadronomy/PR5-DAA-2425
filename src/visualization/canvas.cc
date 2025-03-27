@@ -282,6 +282,7 @@ void Canvas::RenderWindow() {
 
   // Begin canvas window
   ImGui::Begin("Canvas", nullptr, window_flags);
+  ImGui::PopStyleVar();
 
   // Get window content region info
   ImVec2 window_size = ImGui::GetContentRegionAvail();
@@ -317,8 +318,8 @@ void Canvas::RenderWindow() {
 
   // Add shader debug controls if shader is ready
   if (shader_ready_ && ImGui::Begin("Canvas Debug", nullptr, ImGuiWindowFlags_NoCollapse)) {
+    // Debug Shader Toggle
     if (ImGui::Checkbox("Debug Shader", &shader_debug_mode_)) {
-      // Update was triggered by checkbox
       Update();
     }
 
@@ -330,21 +331,31 @@ void Canvas::RenderWindow() {
 
       if (ImGui::Combo("Debug Parameter", &current_item, items, IM_ARRAYSIZE(items))) {
         shader_debug_param_ = values[current_item];
-        // Update was triggered by dropdown
         Update();
       }
 
-      ImGui::Text("Debug Controls:");
-      ImGui::Text("- Shows different grid aspects based on debug mode");
-      ImGui::Text("- Select parameter to fine-tune visualization");
+      // Help text section
+      ImGui::Separator();
+      ImGui::TextColored(ImVec4(0.78f, 0.78f, 0.5f, 1.0f), "Debug Controls:");
+      ImGui::BulletText("Shows different grid aspects based on debug mode");
+      ImGui::BulletText("Select parameter to fine-tune visualization");
+      ImGui::Separator();
     }
 
-    // Add camera information section
+    // Camera Information Section
     if (ImGui::CollapsingHeader("Camera Information", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.8f, 1.0f), "Camera Properties:");
+      ImGui::Indent(10);
       ImGui::Text("Target: (%.2f, %.2f)", camera_.target.x, camera_.target.y);
       ImGui::Text("Zoom: %.4f", camera_.zoom);
+      ImGui::Text("Grid Size: %.2f", grid_size_);
+      ImGui::Unindent(10);
 
-      // Get and display mouse position in world coordinates
+      ImGui::Spacing();
+      
+      // Mouse position information
+      ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.8f, 1.0f), "Mouse Coordinates:");
+      ImGui::Indent(10);
       ImVec2 window_pos = ImGui::GetWindowPos();
       ImVec2 content_min = ImGui::GetWindowContentRegionMin();
       Vector2 canvas_origin = {window_pos.x + content_min.x, window_pos.y + content_min.y};
@@ -352,14 +363,17 @@ void Canvas::RenderWindow() {
       Vector2 canvas_mouse_pos = {mouse_pos.x - canvas_origin.x, mouse_pos.y - canvas_origin.y};
       Vector2 world_mouse_pos = ScreenToWorld(canvas_mouse_pos);
 
-      ImGui::Text("Mouse (Screen): (%.2f, %.2f)", canvas_mouse_pos.x, canvas_mouse_pos.y);
-      ImGui::Text("Mouse (World): (%.2f, %.2f)", world_mouse_pos.x, world_mouse_pos.y);
+      ImGui::Text("Screen: (%.2f, %.2f)", canvas_mouse_pos.x, canvas_mouse_pos.y);
+      ImGui::Text("World:  (%.2f, %.2f)", world_mouse_pos.x, world_mouse_pos.y);
+      ImGui::Unindent(10);
 
-      // Grid info
-      ImGui::Text("Grid Size: %.2f", grid_size_);
-
-      // Add camera control buttons for precise adjustments
-      if (ImGui::Button("Reset Camera")) {
+      ImGui::Spacing();
+      
+      // Camera control buttons
+      ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.8f, 1.0f), "Camera Controls:");
+      ImGui::Indent(10);
+      
+      if (ImGui::Button("Reset Camera", ImVec2(120, 0))) {
         camera_.target = Vector2{0, 0};
         camera_.offset = Vector2{width_ / 2.0f, height_ / 2.0f};
         camera_.zoom = 1.0f;
@@ -368,16 +382,16 @@ void Canvas::RenderWindow() {
 
       ImGui::SameLine();
 
-      if (ImGui::Button("Center Origin")) {
+      if (ImGui::Button("Center Origin", ImVec2(120, 0))) {
         camera_.target = Vector2{0, 0};
         camera_.offset = Vector2{width_ / 2.0f, height_ / 2.0f};
         Update();
       }
+      ImGui::Unindent(10);
     }
 
     ImGui::End();  // End of "Canvas Debug" window
   }
 
   ImGui::End();  // End of "Canvas" window
-  ImGui::PopStyleVar();
 }

@@ -1,5 +1,6 @@
 #include <cstdint>
 
+#include "visualization/imgui_theme.h"
 #include "visualization/object_manager.h"
 
 #include "imgui.h"
@@ -88,11 +89,57 @@ void ObjectManager::HandleObjectInteraction(
 
     // Display tooltip when hovering
     if (is_hovered) {
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 12));
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 8));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.8f, 0.8f, 0.8f, 0.3f));
       ImGui::BeginTooltip();
-      ImGui::Text("%s", obj.name.c_str());
-      ImGui::Text("Position: (%.1f, %.1f)", obj.position.x, obj.position.y);
-      ImGui::Text("Size: %.1f", obj.size);
+
+      // Tooltip title with background
+      ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.2f, 0.2f, 0.2f, 0.8f));
+      ImGui::PushFont(ImGuiThemeManager::GetInstance().GetFont("Geist Mono"));
+      ImGui::Separator();
+      ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.4f, 1.0f), "%s", obj.name.c_str());
+      ImGui::PopFont();
+      ImGui::Separator();
+      ImGui::PopStyleColor();
+
+      ImGui::Spacing();
+
+      // Object properties
+      ImGui::Columns(2, "ObjectProperties", false);
+      ImGui::SetColumnWidth(0, 100);
+
+      ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "Position:");
+      ImGui::NextColumn();
+      ImGui::Text("X: %.1f, Y: %.1f", obj.position.x, obj.position.y);
+      ImGui::NextColumn();
+
+      ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "Size:");
+      ImGui::NextColumn();
+      ImGui::Text("%.1f px", obj.size);
+      ImGui::NextColumn();
+
+      ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "Color:");
+      ImGui::NextColumn();
+
+      // Color preview box
+      ImVec4 objColor = ImVec4(
+        obj.color.r / 255.0f, obj.color.g / 255.0f, obj.color.b / 255.0f, obj.color.a / 255.0f
+      );
+      ImGui::ColorButton("##ColorPreview", objColor, ImGuiColorEditFlags_NoTooltip, ImVec2(20, 10));
+      ImGui::SameLine(0, 5);
+      ImGui::Text("R:%d G:%d B:%d", obj.color.r, obj.color.g, obj.color.b);
+
+      ImGui::Columns(1);
+      ImGui::Spacing();
+
+      // Bottom info
+      ImGui::Separator();
+      ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Click and drag to move");
+
       ImGui::EndTooltip();
+      ImGui::PopStyleColor();
+      ImGui::PopStyleVar(2);
     }
   }
 }
