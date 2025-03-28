@@ -13,7 +13,7 @@ pub const Extension = enum {
 pub const cppflags = [_][]const u8{
     "-DASIO_HAS_THREADS",
     "-fcolor-diagnostics",
-    "-std=c++20",
+    "-std=c++23",
     // "-Wall",
     // "-Wextra",
     // "-Werror",
