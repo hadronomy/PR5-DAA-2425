@@ -2,7 +2,7 @@
 
 #include <memory>
 #include <string_view>
-#include <type_traits>
+
 #include "algorithm_registry.h"
 
 namespace daa {
