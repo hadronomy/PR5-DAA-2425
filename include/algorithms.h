@@ -17,24 +17,6 @@
 #include "algorithm_registry.h"
 // IWYU pragma: end_exports
 
-// Ensure all algorithms are registered at compile time
-namespace {
-// This will be instantiated at compile time
-struct RegisterAlgorithms {
-  RegisterAlgorithms() {
-    // Registration happens when this constructor runs
-    // The registration code will execute before main()
-
-    // Supports using 'all' keyword in the compare command to run
-    // comparison with all available algorithms
-    // Example: dac compare all
-  }
-};
-
-// Create an instance to trigger registration
-RegisterAlgorithms register_algorithms_instance;
-}  // namespace
-
 // Include algorithm implementations with direct registration
 // IWYU pragma: begin_exports
 // TODO: Add all algorithm headers here

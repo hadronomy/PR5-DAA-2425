@@ -1,10 +1,12 @@
 #pragma once
 #include <chrono>
+#include <concepts>
 #include <functional>
 #include <future>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -15,6 +17,18 @@ namespace daa {
 // Forward declaration
 template <typename T>
 class DataGenerator;
+
+// Concepts for algorithms and their capabilities
+template <typename T>
+concept AlgorithmBase = requires(T a) {
+  { a.name() } -> std::convertible_to<std::string>;
+  { a.description() } -> std::convertible_to<std::string>;
+};
+
+template <typename T, typename Input, typename Output>
+concept SolvableAlgorithm = AlgorithmBase<T> && requires(T a, const Input& input) {
+  { a.solve(input) } -> std::convertible_to<Output>;
+};
 
 /**
  * @brief Base class for algorithms
@@ -79,7 +93,6 @@ class TypedAlgorithm : public Algorithm {
 class AlgorithmRegistry {
  public:
   using AlgorithmCreator = std::function<std::unique_ptr<Algorithm>()>;
-  using BenchmarkFunction = std::function<void(const std::string&, int, int, bool, int timeLimit)>;
 
   // Get singleton instance
   static AlgorithmRegistry& instance() {
@@ -87,41 +100,42 @@ class AlgorithmRegistry {
     return instance;
   }
 
-  // Register an algorithm creator function
+  // Register an algorithm creator function - enhanced with concepts
   template <typename T>
-  static bool registerAlgorithm(const std::string& name) {
-    instance().algorithms_[name] = []() {
+  requires std::derived_from<T, Algorithm> static bool registerAlgorithm(std::string_view name) {
+    instance().algorithms_[std::string(name)] = []() {
       return std::make_unique<T>();
     };
     return true;
   }
 
   // Create algorithm by name
-  static std::unique_ptr<Algorithm> create(const std::string& name) {
+  static std::unique_ptr<Algorithm> create(std::string_view name) {
     auto& registry = instance();
-    auto it = registry.algorithms_.find(name);
+    auto it = registry.algorithms_.find(std::string(name));
     if (it == registry.algorithms_.end()) {
-      throw std::runtime_error("Algorithm '" + name + "' not found");
+      throw std::runtime_error(std::string("Algorithm '") + std::string(name) + "' not found");
     }
     return it->second();
   }
 
-  // Create a typed algorithm by name
+  // Create a typed algorithm by name with improved type safety
   template <typename InputType, typename OutputType>
-  static std::unique_ptr<TypedAlgorithm<InputType, OutputType>> createTyped(const std::string& name
-  ) {
+  static std::unique_ptr<TypedAlgorithm<InputType, OutputType>> createTyped(std::string_view name) {
     auto algorithm = create(name);
     auto* typed_algorithm =
       dynamic_cast<TypedAlgorithm<InputType, OutputType>*>(algorithm.release());
     if (!typed_algorithm) {
-      throw std::runtime_error("Algorithm '" + name + "' has incompatible types");
+      throw std::runtime_error(
+        std::string("Algorithm '") + std::string(name) + "' has incompatible types"
+      );
     }
     return std::unique_ptr<TypedAlgorithm<InputType, OutputType>>(typed_algorithm);
   }
 
   // Check if an algorithm exists
-  static bool exists(const std::string& name) {
-    return instance().algorithms_.find(name) != instance().algorithms_.end();
+  static bool exists(std::string_view name) {
+    return instance().algorithms_.find(std::string(name)) != instance().algorithms_.end();
   }
 
   // List all registered algorithms
@@ -135,7 +149,7 @@ class AlgorithmRegistry {
   }
 
   // Get algorithm description
-  static std::string getDescription(const std::string& name) {
+  static std::string getDescription(std::string_view name) {
     if (!exists(name)) {
       return "Algorithm not available";
     }
@@ -144,78 +158,12 @@ class AlgorithmRegistry {
   }
 
   // Get algorithm time complexity
-  static std::string getTimeComplexity(const std::string& name) {
+  static std::string getTimeComplexity(std::string_view name) {
     if (!exists(name)) {
       return "Algorithm not available";
     }
     auto algo = create(name);
     return algo->timeComplexity();
-  }
-
-  // Register a benchmark function
-  static void registerBenchmarkFunction(const std::string& name, BenchmarkFunction function) {
-    instance().benchmark_functions_[name] = function;
-  }
-
-  // Register a benchmark function with input/output types
-  template <typename InputType, typename OutputType>
-  static void register_benchmark_function(const std::string& name, BenchmarkFunction function) {
-    instance().benchmark_functions_[name] = function;
-  }
-
-  // Run a benchmark for an algorithm
-  static bool runBenchmark(
-    const std::string& name,
-    int iterations,
-    int test_size,
-    bool debug,
-    int time_limit = Algorithm::DEFAULT_TIME_LIMIT_MS
-  ) {
-    auto& benchmark_functions = instance().benchmark_functions_;
-    auto it = benchmark_functions.find(name);
-    if (it != benchmark_functions.end()) {
-      it->second(name, iterations, test_size, debug, time_limit);
-      return true;
-    }
-    return false;
-  }
-
-  // Register a data generator
-  template <typename InputType>
-  static void registerDataGenerator(
-    const std::string& name,
-    std::unique_ptr<DataGenerator<InputType>> generator
-  ) {
-    instance().register_data_generator(name, std::move(generator));
-  }
-
-  // Register a data generator (instance method)
-  template <typename InputType>
-  void register_data_generator(
-    const std::string& name,
-    std::unique_ptr<DataGenerator<InputType>> generator
-  ) {
-    auto shared_gen = std::shared_ptr<DataGenerator<InputType>>(generator.release());
-    data_generators_[name] = [shared_gen](int size) -> void* {
-      return new InputType(shared_gen->generate(size));
-    };
-  }
-
-  // Generate test data for an algorithm
-  template <typename InputType>
-  static InputType generateData(const std::string& name, int size) {
-    auto& data_generators = instance().data_generators_;
-    auto it = data_generators.find(name);
-
-    if (it == data_generators.end()) {
-      throw std::runtime_error("Data generator not found for: " + name);
-    }
-
-    void* raw_ptr = it->second(size);
-    InputType* data_ptr = static_cast<InputType*>(raw_ptr);
-    InputType result = *data_ptr;
-    delete data_ptr;
-    return result;
   }
 
   // List all algorithms with their descriptions
@@ -268,16 +216,45 @@ class AlgorithmRegistry {
 
   // Store algorithm creators
   std::unordered_map<std::string, AlgorithmCreator> algorithms_;
-
-  // Store benchmark functions
-  std::unordered_map<std::string, BenchmarkFunction> benchmark_functions_;
-
-  // Store data generators
-  std::unordered_map<std::string, std::function<void*(int)>> data_generators_;
 };
 
-// Helper macro for algorithm registration
-#define REGISTER_ALGORITHM(className, name) \
-  static bool className##_registered = AlgorithmRegistry::registerAlgorithm<className>(name)
+/**
+ * @brief Helper for simplified algorithm registration with type deduction
+ *
+ * @tparam T Algorithm implementation class
+ */
+template <typename T>
+requires std::derived_from<T, Algorithm> struct AlgorithmRegistrar {
+  explicit AlgorithmRegistrar(std::string_view name) {
+    AlgorithmRegistry::registerAlgorithm<T>(name);
+  }
+};
+
+/**
+ * @brief Factory for creating algorithms with specific input/output types
+ *
+ * @tparam InputType Algorithm input type
+ * @tparam OutputType Algorithm output type
+ */
+template <typename InputType, typename OutputType>
+class TypedAlgorithmFactory {
+ public:
+  static std::unique_ptr<TypedAlgorithm<InputType, OutputType>> create(std::string_view name) {
+    return AlgorithmRegistry::createTyped<InputType, OutputType>(name);
+  }
+
+  template <typename T>
+  requires SolvableAlgorithm<T, InputType, OutputType>&&
+    std::derived_from<T, TypedAlgorithm<InputType, OutputType>> static bool
+    registerAlgorithm(std::string_view name) {
+    return AlgorithmRegistry::registerAlgorithm<T>(name);
+  }
+};
+
+// Enhanced macro for algorithm registration
+#define REGISTER_ALGORITHM(className, name)                                    \
+  namespace {                                                                  \
+  static const daa::AlgorithmRegistrar<className> className##_registrar(name); \
+  }
 
 }  // namespace daa

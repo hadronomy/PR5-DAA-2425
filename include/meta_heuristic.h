@@ -7,7 +7,7 @@
 
 namespace daa {
 
-// Concept for algorithm interfaces
+// Concept for algorithm interfaces - more concise with using the refined concept
 template <typename A, typename S, typename P>
 concept Algorithm = requires(A a, const P& p) {
   { a.solve(p) } -> std::convertible_to<S>;
@@ -64,5 +64,8 @@ requires meta::Solution<S, P>&& Algorithm<A, S, P> class MetaHeuristic : public 
            localSearch_->name() + " for improvement";
   }
 };
+
+// Register a meta-heuristic as a regular algorithm
+#define REGISTER_META_ALGORITHM(className, name) REGISTER_ALGORITHM(className, name)
 
 }  // namespace daa
