@@ -46,11 +46,11 @@ constexpr auto timestamp = "{:%H:%M:%S}";
 /**
  * Application name and version
  */
-constexpr const char* app_name = "tsp";
+constexpr const char* app_name = "meta";
 constexpr const char* app_version = "0.1.0";
 constexpr const char* app_description =
-  "benchmarking tool for multiple traveling salesman algorithms";
-constexpr const char* repo_url = "https://github.com/hadronomy/PR4-DAA-2425";
+  "benchmarking and analysis tool for meta-heuristic algorithms";
+constexpr const char* repo_url = "https://github.com/hadronomy/PR5-DAA-2425";
 
 /**
  * Default configuration values

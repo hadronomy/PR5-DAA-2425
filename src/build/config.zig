@@ -1,4 +1,4 @@
-pub const program_name = "tsp";
+pub const program_name = "meta";
 pub const version = "0.1.0";
 
 pub const cfiles_exts = [_][]const u8{ ".c", ".cpp", ".cxx", ".c++", ".cc" };

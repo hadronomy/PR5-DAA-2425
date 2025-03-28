@@ -1,7 +1,5 @@
 #pragma once
 
-#include <fmt/core.h>
-
 #include "command_handler.h"
 #include "command_registry.h"
 
@@ -10,16 +8,24 @@ namespace daa {
 /**
  * Command handler for listing available algorithms
  */
-class ListAlgorithmsCommand : public CommandHandler {
+class ListAlgorithmsCommand : public CommandHandlerBase<ListAlgorithmsCommand> {
  public:
-  ListAlgorithmsCommand(bool verbose) : CommandHandler(verbose) {}
+  explicit ListAlgorithmsCommand(bool verbose) : CommandHandlerBase(verbose) {}
 
   bool execute() override;
 
-  /**
-   * Register this command with the command registry
-   */
-  static void registerCommand(CommandRegistry& registry);
+  // Register this command with the registry
+  static void registerCommand(CommandRegistry& registry) {
+    registry.registerCommandType<ListAlgorithmsCommand>(
+      "list",
+      "List all available algorithms",
+      [](CLI::App* cmd) { return cmd; },  // No additional CLI options needed
+      [](bool verbose) { return std::make_unique<ListAlgorithmsCommand>(verbose); }
+    );
+  }
 };
+
+// Auto-register the command
+REGISTER_COMMAND(ListAlgorithmsCommand);
 
 }  // namespace daa

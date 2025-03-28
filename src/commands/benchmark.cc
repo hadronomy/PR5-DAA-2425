@@ -1,19 +1,19 @@
-
-#include "ui.h"
-
 #include "commands/benchmark.h"
 
+#include <fmt/format.h>
 #include <CLI/CLI.hpp>
 
+#include "algorithm_factory.h"
 #include "commands.h"
 #include "config.h"
 #include "time_utils.h"
+#include "ui.h"
 
 namespace daa {
 
 bool BenchmarkCommand::execute() {
   try {
-    if (!AlgorithmRegistry::exists(algo_name_)) {
+    if (!AlgorithmFactory::exists(algo_name_)) {
       UI::error(fmt::format("Algorithm '{}' not found", algo_name_));
       return false;
     }
@@ -38,7 +38,7 @@ bool BenchmarkCommand::execute() {
       }
     }
 
-    // Set the global time limit for all algorithms - now works with non-const static variable
+    // Set the global time limit for all algorithms
     Algorithm::DEFAULT_TIME_LIMIT_MS = time_limit_ms_;
 
     // Use either files or generated data

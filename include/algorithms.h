@@ -14,13 +14,24 @@
 
 // Include core headers first
 // IWYU pragma: begin_exports
+#include "algorithm_factory.h"
 #include "algorithm_registry.h"
 // IWYU pragma: end_exports
 
 // Include algorithm implementations with direct registration
 // IWYU pragma: begin_exports
-// TODO: Add all algorithm headers here
+// TODO: Add all other algorithm headers here
 // IWYU pragma: end_exports
+
+namespace daa {
+
+// Initialize Factory and register global algorithms
+inline void initializeAlgorithms() {
+  // This function is called implicitly when the header is included
+  // You can add any initialization code here if needed
+}
+
+}  // namespace daa
 
 // Restore warning settings
 #ifdef __GNUC__

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include <string>
+#include <string_view>
 
 #include <CLI/CLI.hpp>
 
@@ -10,88 +10,104 @@
 namespace daa {
 
 /**
- * @class Application
- * @brief Main application class that encapsulates CLI setup and execution
- *
- * This class provides a cleaner API for setting up the application,
- * registering commands, and executing the command line interface.
+ * @brief Main application class that sets up and runs the CLI app
  */
 class Application {
  public:
   /**
-   * @brief Create a new Application instance
+   * @brief Create a new application instance
    *
    * @param name Application name
    * @param description Application description
-   * @return Application instance with basic configuration
+   * @return Application instance
    */
-  static Application create(const std::string& name, const std::string& description);
+  static Application create(std::string_view name, std::string_view description);
 
   /**
-   * @brief Set the application version
+   * @brief Set application version
    *
    * @param version Version string
-   * @return Reference to this Application for method chaining
+   * @return Reference to this for method chaining
    */
-  Application& withVersion(const std::string& version);
+  Application& withVersion(std::string_view version);
 
   /**
-   * @brief Enable verbose output option
+   * @brief Add verbose flag to the application
    *
-   * @return Reference to this Application for method chaining
+   * @return Reference to this for method chaining
    */
   Application& withVerboseOption();
 
   /**
-   * @brief Use custom formatter for help output
+   * @brief Register standard commands with the application
    *
-   * @tparam FormatterType Type of formatter to use
-   * @return Reference to this Application for method chaining
-   */
-  template <typename FormatterType>
-  Application& withFormatter() {
-    auto formatter = std::make_shared<FormatterType>();
-    app_.formatter(formatter);
-    formatter_ = formatter;
-    return *this;
-  }
-
-  /**
-   * @brief Register all standard benchmark commands
-   *
-   * @return Reference to this Application for method chaining
+   * @return Reference to this for method chaining
    */
   Application& withStandardCommands();
 
   /**
-   * @brief Register a specific command
+   * @brief Set a custom formatter for the CLI
+   *
+   * @tparam FormatterType Type of formatter to use (must derive from CLI::Formatter)
+   * @return Reference to this for method chaining
+   */
+  template <typename FormatterType>
+  requires std::derived_from<FormatterType, CLI::Formatter> Application& withFormatter() {
+    formatter_ = std::make_shared<FormatterType>();
+    app_.formatter(formatter_);
+    return *this;
+  }
+
+  /**
+   * @brief Set a custom formatter instance for the CLI
+   *
+   * @param formatter Shared pointer to an existing formatter instance
+   * @return Reference to this for method chaining
+   */
+  Application& withFormatter(std::shared_ptr<CLI::Formatter> formatter) {
+    formatter_ = std::move(formatter);
+    app_.formatter(formatter_);
+    return *this;
+  }
+
+  /**
+   * @brief Register a command with the application
    *
    * @tparam CommandType Type of command to register
-   * @return Reference to this Application for method chaining
+   * @return Reference to this for method chaining
    */
   template <typename CommandType>
-  Application& registerCommand() {
+  requires CommandHandlerType<CommandType> Application& registerCommand() {
     CommandType::registerCommand(registry_);
     return *this;
   }
 
   /**
-   * @brief Parse command line arguments and execute the selected command
+   * @brief Run the application with command line arguments
    *
    * @param argc Argument count
    * @param argv Argument values
-   * @return Exit code (0 for success, non-zero for error)
+   * @return Exit code
    */
   int run(int argc, char** argv);
 
  private:
+  Application(std::string_view name, std::string_view description);
+
+  // Setup all registered commands
+  void setupCommands();
+
+  // Main CLI app
   CLI::App app_;
+
+  // Command registry reference
   CommandRegistry& registry_;
-  std::shared_ptr<CLI::FormatterBase> formatter_;
+
+  // Verbose flag
   bool verbose_ = false;
 
-  Application(const std::string& name, const std::string& description);
-  void setupCommands();
+  // Custom formatter if set
+  std::shared_ptr<CLI::Formatter> formatter_;
 };
 
 }  // namespace daa

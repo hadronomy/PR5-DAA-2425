@@ -1,140 +1,112 @@
 #pragma once
 
-#include <CLI/CLI.hpp>
+#include <concepts>
 #include <functional>
-#include <iostream>
-#include <map>
 #include <memory>
 #include <string>
-#include <type_traits>
+#include <string_view>
 #include <unordered_map>
-#include <vector>
 
 #include "command_handler.h"
 
+namespace CLI {
+class App;
+};
+
 namespace daa {
+
+class CommandHandler;
+
+// Concepts for commands and their capabilities
+template <typename T>
+concept CommandHandlerType = requires(T instance) {
+  { instance.execute() } -> std::convertible_to<bool>;
+  { T::registerCommand(std::declval<class CommandRegistry&>()) } -> std::same_as<void>;
+};
 
 /**
  * @class CommandRegistry
- * @brief Registry for CLI commands with factory methods
+ *
+ * Registry for command handlers with factory methods to create them
+ * at runtime based on CLI input.
  */
 class CommandRegistry {
  public:
-  // Command handler factory function type
-  using CommandHandlerFactory = std::function<std::unique_ptr<CommandHandler>(bool verbose)>;
+  // Type definitions for command factories and command setup functions
+  using CommandFactory = std::function<std::unique_ptr<CommandHandler>(bool verbose)>;
+  using CommandSetup = std::function<CLI::App*(CLI::App*)>;
 
-  // Simple command function type (for legacy support)
-  using SimpleCommandHandler = std::function<int(const std::vector<std::string>&)>;
-
-  // Singleton access
+  // Get singleton instance
   static CommandRegistry& instance() {
     static CommandRegistry instance;
     return instance;
   }
 
-  /**
-   * Register a command with the registry
-   *
-   * @param name Command name
-   * @param description Command description
-   * @param factory Factory function to create command handler
-   * @param setupFunc Function to setup command options
-   */
+  // Register a command with all required metadata
   void registerCommand(
-    const std::string& name,
-    const std::string& description,
-    CommandHandlerFactory factory,
-    std::function<void(CLI::App*)> setupFunc
+    std::string_view name,
+    std::string_view description,
+    CommandSetup setup_function,
+    CommandFactory factory_function
   ) {
-    factories_[name] = std::move(factory);
-    setupFunctions_[name] = std::move(setupFunc);
-    commandInfo_[name] = description;
-  }
+    std::string name_str(name);
 
-  /**
-   * Register a simple command function
-   */
-  void register_command(const std::string& name, SimpleCommandHandler handler) {
-    simpleCommands_[name] = handler;
-  }
-
-  /**
-   * Execute a simple command
-   */
-  int execute(const std::string& command, const std::vector<std::string>& args) {
-    auto it = simpleCommands_.find(command);
-    if (it == simpleCommands_.end()) {
-      std::cerr << "Unknown command: " << command << std::endl;
-      std::cerr << "Run 'help' for a list of available commands" << std::endl;
-      return 1;
+    // Check if this command name is already registered
+    if (command_factories_.find(name_str) != command_factories_.end()) {
+      // Command already registered, skip re-registration
+      return;
     }
 
-    return it->second(args);
+    command_names_.push_back(name_str);
+    command_descriptions_[name_str] = std::string(description);
+    command_setups_[name_str] = std::move(setup_function);
+    command_factories_[name_str] = std::move(factory_function);
   }
 
-  /**
-   * Set up all registered commands for a CLI::App
-   *
-   * @param app CLI::App instance to set up
-   * @return Map of command name to CLI::App subcommand
-   */
-  std::map<std::string, CLI::App*> setupCommands(CLI::App& app) {
-    std::map<std::string, CLI::App*> commands;
+  // Check if a command exists
+  [[nodiscard]] bool commandExists(std::string_view name) const {
+    return command_factories_.find(std::string(name)) != command_factories_.end();
+  }
 
-    for (const auto& [name, description] : commandInfo_) {
-      auto cmd = app.add_subcommand(name, description);
-      commands[name] = cmd;
-
-      // Call the setup function for this command
-      if (auto it = setupFunctions_.find(name); it != setupFunctions_.end()) {
-        it->second(cmd);
-      }
+  // Create a handler for a command by name
+  [[nodiscard]] std::unique_ptr<CommandHandler> createHandler(std::string_view name, bool verbose)
+    const {
+    auto it = command_factories_.find(std::string(name));
+    if (it == command_factories_.end()) {
+      return nullptr;
     }
-
-    return commands;
+    return it->second(verbose);
   }
 
-  /**
-   * Create a command handler based on the parsed command
-   *
-   * @param commandName Name of the command to create
-   * @param verbose Whether verbose mode is enabled
-   * @return Unique pointer to command handler
-   */
-  std::unique_ptr<CommandHandler> createHandler(const std::string& commandName, bool verbose) {
-    auto it = factories_.find(commandName);
-    if (it != factories_.end()) {
-      return it->second(verbose);
-    }
-    return nullptr;
-  }
+  // Setup all CLI commands
+  [[nodiscard]] std::unordered_map<std::string, CLI::App*> setupCommands(CLI::App& app) const;
 
-  /**
-   * Template method for easy command registration
-   *
-   * @tparam CommandType Type of command handler class
-   * @param name Command name
-   * @param description Command description
-   * @param setupFunc Function to set up command options
-   */
-  template <typename CommandType>
-  void registerCommandType(
-    const std::string& name,
-    const std::string& description,
-    std::function<CLI::App*(CLI::App*)> setupFunc,
-    std::function<std::unique_ptr<CommandType>(bool)> factory
+  // Type-safe registration helper for command types
+  template <typename Command>
+  requires CommandHandlerType<Command> void registerCommandType(
+    std::string_view name,
+    std::string_view description,
+    CommandSetup setup_function,
+    CommandFactory factory_function
   ) {
+    registerCommand(name, description, std::move(setup_function), std::move(factory_function));
+  }
 
-    static_assert(
-      std::is_base_of<CommandHandler, CommandType>::value,
-      "Command type must inherit from CommandHandler"
-    );
-
+  // Enhanced registration helper with automatic type deduction
+  template <typename Command>
+  requires CommandHandlerType<Command> void registerCommandType(
+    std::string_view name,
+    std::string_view description,
+    std::function<CLI::App*(CLI::App*)> setup,
+    std::function<std::unique_ptr<Command>(bool)> factory
+  ) {
     registerCommand(
       name,
       description,
-      [factory](bool verbose) -> std::unique_ptr<CommandHandler> { return factory(verbose); },
-      [setupFunc](CLI::App* app) { setupFunc(app); }
+      std::move(setup),
+      [factory = std::move(factory)](bool verbose) -> std::unique_ptr<CommandHandler> {
+        return factory(verbose);
+      }
     );
   }
 
@@ -142,11 +114,27 @@ class CommandRegistry {
   // Private constructor for singleton
   CommandRegistry() = default;
 
-  // Maps to store command data
-  std::unordered_map<std::string, CommandHandlerFactory> factories_;
-  std::unordered_map<std::string, std::function<void(CLI::App*)>> setupFunctions_;
-  std::unordered_map<std::string, std::string> commandInfo_;
-  std::unordered_map<std::string, SimpleCommandHandler> simpleCommands_;
+  // Command registration data
+  std::vector<std::string> command_names_;  // Preserve order for help display
+  std::unordered_map<std::string, std::string> command_descriptions_;
+  std::unordered_map<std::string, CommandSetup> command_setups_;
+  std::unordered_map<std::string, CommandFactory> command_factories_;
 };
+
+/**
+ * @brief Helper for simplified command registration
+ *
+ * @tparam T Command implementation class
+ */
+template <typename T>
+requires CommandHandlerType<T> struct CommandRegistrar {
+  CommandRegistrar() { T::registerCommand(CommandRegistry::instance()); }
+};
+
+// Enhanced macros for command registration
+#define REGISTER_COMMAND(className)                                    \
+  namespace {                                                          \
+  static const daa::CommandRegistrar<className> className##_registrar; \
+  }
 
 }  // namespace daa

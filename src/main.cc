@@ -1,5 +1,3 @@
-#include <string>
-
 #include "application.h"
 #include "colorized_formatter.h"
 #include "config.h"

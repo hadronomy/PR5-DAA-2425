@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-
 #include <fmt/core.h>
 
 #include "command_handler.h"
@@ -13,19 +11,17 @@ namespace daa {
  * Command handler for visualize command
  * Opens a visualization window using Dear ImGui
  */
-class VisualizeCommand : public CommandHandler {
+class VisualizeCommand : public CommandHandlerBase<VisualizeCommand> {
  public:
-  VisualizeCommand(bool verbose) : CommandHandler(verbose) {}
+  explicit VisualizeCommand(bool verbose) : CommandHandlerBase(verbose) {}
 
   bool execute() override;
 
-  /**
-   * Register this command with the command registry
-   */
+  // Register this command with the registry
   static void registerCommand(CommandRegistry& registry);
-
- private:
-  std::string path_;
 };
+
+// Auto-register the command
+REGISTER_COMMAND(VisualizeCommand);
 
 }  // namespace daa

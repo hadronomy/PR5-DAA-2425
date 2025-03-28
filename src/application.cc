@@ -1,26 +1,26 @@
 #include "application.h"
 
+#include <fmt/format.h>
+
+#include "algorithm_factory.h"
 #include "algorithms.h"  // Include this first to trigger static registration
-#include "commands.h"
 #include "ui.h"
 
 namespace daa {
 
-Application Application::create(const std::string& name, const std::string& description) {
-  // setup_algorithm_registry();
-
-  auto algorithms = AlgorithmRegistry::availableAlgorithms();
+Application Application::create(std::string_view name, std::string_view description) {
+  auto algorithms = AlgorithmFactory::availableAlgorithms();
   if (algorithms.empty()) {
     UI::warning("No algorithms were registered during initialization.");
   }
   return Application(name, description);
 }
 
-Application::Application(const std::string& name, const std::string& description)
-    : app_(description, name), registry_(CommandRegistry::instance()) {}
+Application::Application(std::string_view name, std::string_view description)
+    : app_(std::string(description), std::string(name)), registry_(CommandRegistry::instance()) {}
 
-Application& Application::withVersion(const std::string& version) {
-  app_.set_version_flag("--version", version, "Print version information and exit");
+Application& Application::withVersion(std::string_view version) {
+  app_.set_version_flag("--version", std::string(version), "Print version information and exit");
   return *this;
 }
 
@@ -30,18 +30,12 @@ Application& Application::withVerboseOption() {
 }
 
 Application& Application::withStandardCommands() {
-  registerCommand<BenchmarkCommand>()
-    .registerCommand<CompareCommand>()
-    .registerCommand<ListAlgorithmsCommand>()
-    .registerCommand<ValidateCommand>()
-    .registerCommand<VisualizeCommand>();
+  // Commands are now auto-registered via the REGISTER_COMMAND macro
+  // But we need to make sure the command headers are included
   return *this;
 }
 
 int Application::run(int argc, char** argv) {
-  // Setup algorithm registry
-  // setup_algorithm_registry();
-
   // Set up help flags
   app_.set_help_flag("-h,--help", "Display help information");
   app_.set_help_all_flag("--help-all", "Show help for all subcommands");

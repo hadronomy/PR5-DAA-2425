@@ -1,7 +1,9 @@
-#include "algorithm_registry.h"
-#include "ui.h"
-
 #include "commands/list.h"
+
+#include <fmt/format.h>
+
+#include "algorithm_factory.h"
+#include "ui.h"
 
 namespace daa {
 
@@ -12,12 +14,12 @@ bool ListAlgorithmsCommand::execute() {
     }
 
     // Make sure we have algorithms registered before listing
-    if (AlgorithmRegistry::availableAlgorithms().empty()) {
+    if (AlgorithmFactory::availableAlgorithms().empty()) {
       UI::warning("No algorithms are currently registered.");
       return true;
     }
 
-    // Call the correct method to list algorithms
+    // List algorithms using the registry service
     AlgorithmRegistry::listAlgorithms();
 
     return true;
@@ -27,13 +29,6 @@ bool ListAlgorithmsCommand::execute() {
   }
 }
 
-void ListAlgorithmsCommand::registerCommand(CommandRegistry& registry) {
-  registry.registerCommandType<ListAlgorithmsCommand>(
-    "list",
-    "List all available algorithms",
-    [](CLI::App* cmd) { return cmd; },  // No additional CLI options needed
-    [](bool verbose) { return std::make_unique<ListAlgorithmsCommand>(verbose); }
-  );
-}
+// Registration is handled by the REGISTER_COMMAND macro in the header
 
 }  // namespace daa

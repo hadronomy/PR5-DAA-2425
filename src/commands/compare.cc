@@ -1,13 +1,16 @@
+#include "commands/compare.h"
+
 #include <functional>
 #include <memory>
 
+#include <fmt/format.h>
 #include <CLI/CLI.hpp>
 
+#include "algorithm_factory.h"
 #include "commands.h"
 #include "config.h"
 #include "time_utils.h"
-
-#include "commands/compare.h"
+#include "ui.h"
 
 namespace daa {
 
@@ -22,12 +25,12 @@ bool CompareCommand::execute() {
     if (algo_names_.size() == 1 && algo_names_[0] == "all") {
       // Replace with all available TSP algorithms
       std::vector<std::string> tsp_algos;
-      auto all_algos = AlgorithmRegistry::availableAlgorithms();
+      auto all_algos = AlgorithmFactory::availableAlgorithms();
 
       for (const auto& algo : all_algos) {
         try {
           // Test if it's a TSP algorithm
-          // AlgorithmRegistry::createTyped<Graph<City, double>, Path>(algo);
+          // AlgorithmFactory::createTyped<Graph<City, double>, Path>(algo);
           // tsp_algos.push_back(algo);
           // TODO: Add algorithms
         } catch (...) {
@@ -50,7 +53,7 @@ bool CompareCommand::execute() {
     } else {
       // Verify all algorithm names exist
       for (const auto& name : algo_names_) {
-        if (!AlgorithmRegistry::instance().exists(name)) {
+        if (!AlgorithmFactory::exists(name)) {
           UI::error(fmt::format("Algorithm '{}' not found", name));
           return false;
         }
@@ -114,9 +117,7 @@ void CompareCommand::registerCommand(CommandRegistry& registry) {
       if (val == "all") {
         return std::string();
       }
-      // Add your algorithm name validation logic here
-      // Return empty string for valid names
-      // Return error message string for invalid names
+      // Add algorithm name validation logic here if needed
       return std::string();
     },
     "Valid algorithm name required",
