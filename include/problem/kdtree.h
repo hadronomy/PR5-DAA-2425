@@ -227,6 +227,59 @@ requires KDTreePoint<PointType> class GenericKDTree {
     }
   }
 
+  // Helper function to collect all points in the tree
+  void collectPoints(const Node* node, std::vector<PointContainer>& result) const {
+    if (!node)
+      return;
+
+    result.push_back(node->data);
+    collectPoints(node->left.get(), result);
+    collectPoints(node->right.get(), result);
+  }
+
+  // Helper function to collect all IDs in the tree
+  void collectIds(const Node* node, std::vector<IdType>& result) const {
+    if (!node)
+      return;
+
+    result.push_back(node->data.id);
+    collectIds(node->left.get(), result);
+    collectIds(node->right.get(), result);
+  }
+
+  // Find a point by ID
+  [[nodiscard]] PointContainer findPoint(const IdType& id) const {
+    std::optional<PointContainer> result;
+    findPointByIdRecursive(root_.get(), id, result);
+
+    if (!result) {
+      throw std::out_of_range("Point with ID not found: " + std::string(id));
+    }
+
+    return *result;
+  }
+
+  // Recursively search for a point by ID
+  void findPointByIdRecursive(
+    const Node* node,
+    const IdType& id,
+    std::optional<PointContainer>& result
+  ) const {
+    if (!node)
+      return;
+
+    if (node->data.id == id) {
+      result = node->data;
+      return;
+    }
+
+    findPointByIdRecursive(node->left.get(), id, result);
+    if (result)
+      return;
+
+    findPointByIdRecursive(node->right.get(), id, result);
+  }
+
  public:
   GenericKDTree() = default;
 
@@ -310,6 +363,56 @@ requires KDTreePoint<PointType> class GenericKDTree {
     distance_cache_.clear();
     dimensions_ = 0;
   }
+
+  // Check if tree is empty
+  [[nodiscard]] bool empty() const noexcept { return !root_; }
+
+  // Get all IDs in the tree
+  [[nodiscard]] std::vector<IdType> getAllIds() const {
+    std::vector<IdType> result;
+    collectIds(root_.get(), result);
+    return result;
+  }
+
+  // Insert a new point into the tree
+  void insert(PointContainer new_point) {
+    // Get all existing point IDs
+    auto existing_ids = getAllIds();
+
+    // Update distance cache for new point
+    for (const auto& id : existing_ids) {
+      if (new_point.id != id) {
+        // Calculate distances between the new point and all existing points
+        double dist = distance_calculator_.calculate(new_point.point, findPoint(id).point);
+
+        distance_cache_[new_point.id][id] = dist;
+        distance_cache_[id][new_point.id] = dist;
+      }
+    }
+
+    // Self distance is always 0
+    distance_cache_[new_point.id][new_point.id] = 0.0;
+
+    // If tree is empty, create root
+    if (!root_) {
+      root_ = std::make_unique<Node>(std::move(new_point));
+      dimensions_ = root_->data.point.dimensions();
+      return;
+    }
+
+    // Insert the point maintaining tree balance
+    std::vector<PointContainer> all_points;
+    all_points.reserve(existing_ids.size() + 1);
+
+    // Collect existing points
+    collectPoints(root_.get(), all_points);
+
+    // Add new point
+    all_points.push_back(std::move(new_point));
+
+    // Rebuild the tree to maintain balance
+    root_ = buildTreeRecursive(std::span{all_points}, 0);
+  }
 };
 
 // Specialized KDTree for Locations
@@ -338,25 +441,45 @@ class KDTree {
     locations_.clear();
     time_matrix_.clear();
 
-    std::vector<typename GenericKDTree<LocationAdapter>::PointContainer> points;
-    points.reserve(locations.size());
+    // Use ranges for transforming locations to points
+    auto point_containers =
+      locations | std::ranges::views::transform([](const auto& loc) {
+        return
+          typename GenericKDTree<LocationAdapter>::PointContainer{LocationAdapter(loc), loc.id()};
+      }) |
+      std::ranges::to<std::vector>();
 
-    for (const auto& loc : locations) {
-      locations_[loc.id()] = loc;
-      points.push_back({LocationAdapter(loc), loc.id()});
+    // Store locations in map using ranges
+    locations_ =
+      locations |
+      std::ranges::views::transform([](const auto& loc) { return std::pair{loc.id(), loc}; }) |
+      std::ranges::to<std::unordered_map<std::string, Location>>();
+
+    tree_.build(std::move(point_containers));
+
+    // Pre-calculate time matrix using modern C++ techniques
+    const auto location_ids =
+      locations_ | std::ranges::views::keys | std::ranges::to<std::vector>();
+
+    // Reserve space in time matrix for better performance
+    for (const auto& id : location_ids) {
+      time_matrix_[id].reserve(location_ids.size());
     }
 
-    tree_.build(std::move(points));
+    // Fill time matrix using ranges for clearer expression of intent
+    for (const auto& id1 : location_ids) {
+      auto& id1_map = time_matrix_[id1];
 
-    // Pre-calculate time matrix
-    for (const auto& [id1, loc1] : locations_) {
-      for (const auto& [id2, loc2] : locations_) {
-        if (id1 != id2) {
-          const double dist = tree_.getDistance(id1, id2);
-          time_matrix_[id1][id2] = calculateTime(dist);
-        } else {
-          time_matrix_[id1][id2] = Duration{0.0};
-        }
+      // Self-distance is always 0
+      id1_map[id1] = Duration{0.0};
+
+      // Calculate other distances using ranges
+      auto other_ids =
+        location_ids | std::ranges::views::filter([&id1](const auto& id) { return id != id1; });
+
+      for (const auto& id2 : other_ids) {
+        const double dist = tree_.getDistance(id1, id2);
+        id1_map[id2] = calculateTime(dist);
       }
     }
   }
@@ -389,14 +512,11 @@ class KDTree {
       return adapter.getLocation().type() == target_type;
     });
 
-    std::vector<Location> locations;
-    locations.reserve(results.size());
-
-    for (const auto& result : results) {
-      locations.push_back(locations_.at(result.id));
-    }
-
-    return locations;
+    // Use ranges to transform results to locations
+    return results | std::ranges::views::transform([this](const auto& result) {
+             return locations_.at(result.id);
+           }) |
+           std::ranges::to<std::vector>();
   }
 
   // Get distance between two locations
@@ -411,11 +531,99 @@ class KDTree {
   }
 
   // Check if the tree contains locations
-  [[nodiscard]] bool empty() const noexcept { return locations_.empty(); }
+  [[nodiscard]] bool empty() const noexcept { return tree_.empty(); }
 
   // Get all locations
   [[nodiscard]] const std::unordered_map<std::string, Location>& getLocations() const noexcept {
     return locations_;
+  }
+
+  // Insert a new location into the tree
+  void insert(Location location) {
+    const std::string id = location.id();
+
+    // Store the new location
+    locations_[id] = std::move(location);
+
+    // Create a point container for the new location
+    const LocationAdapter adapter(locations_.at(id));
+    typename GenericKDTree<LocationAdapter>::PointContainer point_container{adapter, id};
+
+    // Insert into the tree
+    tree_.insert(std::move(point_container));
+
+    // Update time matrix with the new location
+    updateTimeMatrixForLocation(id);
+  }
+
+  // Batch insert multiple locations
+  void insertBatch(std::vector<Location> locations) {
+    if (locations.empty())
+      return;
+
+    // Store all new locations
+    for (auto& location : locations) {
+      const std::string id = location.id();
+      locations_[id] = std::move(location);
+    }
+
+    // Rebuild the tree with all locations
+    auto point_containers =
+      locations_ | std::ranges::views::transform([](const auto& pair) {
+        const auto& [id, loc] = pair;
+        return typename GenericKDTree<LocationAdapter>::PointContainer{LocationAdapter(loc), id};
+      }) |
+      std::ranges::to<std::vector>();
+
+    tree_.build(std::move(point_containers));
+
+    // Rebuild the time matrix
+    rebuildTimeMatrix();
+  }
+
+ private:
+  // Update time matrix for a newly added location
+  void updateTimeMatrixForLocation(const std::string& id) {
+    // Ensure the location's self-distance is 0
+    time_matrix_[id][id] = Duration{0.0};
+
+    // Calculate travel times between the new location and all existing locations
+    for (const auto& [other_id, _] : locations_) {
+      if (other_id != id) {
+        const double dist = tree_.getDistance(id, other_id);
+        const auto travel_time = calculateTime(dist);
+
+        // Update both directions
+        time_matrix_[id][other_id] = travel_time;
+        time_matrix_[other_id][id] = travel_time;
+      }
+    }
+  }
+
+  // Completely rebuild the time matrix
+  void rebuildTimeMatrix() {
+    time_matrix_.clear();
+
+    // Get all location IDs
+    const auto ids = locations_ | std::ranges::views::keys | std::ranges::to<std::vector>();
+
+    // Pre-reserve space for efficiency
+    for (const auto& id : ids) {
+      time_matrix_[id].reserve(ids.size());
+    }
+
+    // Populate the time matrix
+    for (const auto& id1 : ids) {
+      // Set self-travel time to 0
+      time_matrix_[id1][id1] = Duration{0.0};
+
+      // Calculate times to other locations
+      for (const auto& id2 :
+           ids | std::ranges::views::filter([&id1](const auto& id) { return id != id1; })) {
+        const double dist = tree_.getDistance(id1, id2);
+        time_matrix_[id1][id2] = calculateTime(dist);
+      }
+    }
   }
 };
 

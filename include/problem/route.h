@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ranges>
 #include <string>
 #include <vector>
 #include "kdtree.h"
@@ -50,6 +51,21 @@ class Route {
   [[nodiscard]] const std::vector<std::string>& sequence() const noexcept { return sequence_; }
   [[nodiscard]] const Capacity& currentLoad() const noexcept { return current_load_; }
   [[nodiscard]] const Duration& totalDuration() const noexcept { return total_duration_; }
+
+  [[nodiscard]] std::vector<const Location*> getLocations(const KDTree& kdtree) const {
+    if (sequence_.empty())
+      return {};
+
+    const auto& locations = kdtree.getLocations();
+
+    return sequence_ |
+           std::ranges::views::transform([&locations](const auto& id) -> const Location* {
+             auto it = locations.find(id);
+             return it != locations.end() ? &it->second : nullptr;
+           }) |
+           std::ranges::views::filter([](const Location* loc) { return loc != nullptr; }) |
+           std::ranges::to<std::vector>();
+  }
 };
 
 }  // namespace daa
