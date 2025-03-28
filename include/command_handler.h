@@ -1,5 +1,7 @@
 #pragma once
 
+namespace daa {
+
 class CommandRegistry;
 
 /**
@@ -41,3 +43,5 @@ class CommandHandler {
    */
   bool verbose_;
 };
+
+}  // namespace daa

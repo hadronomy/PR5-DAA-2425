@@ -3,6 +3,8 @@
 
 #include "commands/list.h"
 
+namespace daa {
+
 bool ListAlgorithmsCommand::execute() {
   try {
     if (verbose_) {
@@ -33,3 +35,5 @@ void ListAlgorithmsCommand::registerCommand(CommandRegistry& registry) {
     [](bool verbose) { return std::make_unique<ListAlgorithmsCommand>(verbose); }
   );
 }
+
+}  // namespace daa

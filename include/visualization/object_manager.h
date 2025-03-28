@@ -5,6 +5,9 @@
 
 #include "raylib.h"
 
+namespace daa {
+namespace visualization {
+
 // Forward declarations
 class Canvas;
 
@@ -41,3 +44,6 @@ class ObjectManager {
 
   void SetupDefaultObjects();
 };
+
+}  // namespace visualization
+}  // namespace daa

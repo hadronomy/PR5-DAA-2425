@@ -6,6 +6,9 @@
 #include <vector>
 #include "imgui.h"
 
+namespace daa {
+namespace visualization {
+
 class Theme {
  public:
   virtual ~Theme() = default;
@@ -78,3 +81,6 @@ class ImGuiThemeManager {
 inline ImGuiThemeManager& GetThemeManager() {
   return ImGuiThemeManager::GetInstance();
 }
+
+}  // namespace visualization
+}  // namespace daa

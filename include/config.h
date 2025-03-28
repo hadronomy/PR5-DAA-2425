@@ -5,6 +5,8 @@
 
 #include <fmt/color.h>
 
+namespace daa {
+
 // Type-safe enum for command types
 enum class CommandType { Process, Analyze, Export };
 
@@ -57,3 +59,5 @@ constexpr std::array<int, 3> default_test_size = {5, 10, 15};
 constexpr int default_iterations = 100;
 
 }  // namespace config
+
+}  // namespace daa

@@ -2,6 +2,8 @@
 
 #include "commands/validate.h"
 
+namespace daa {
+
 bool ValidateCommand::execute() {
   TSPDriver driver;
   bool success = driver.parse_file(path_);
@@ -27,3 +29,5 @@ void ValidateCommand::registerCommand(CommandRegistry& registry) {
     [](bool verbose) { return std::make_unique<ValidateCommand>(input_file, verbose); }
   );
 }
+
+}  // namespace daa

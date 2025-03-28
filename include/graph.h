@@ -16,6 +16,8 @@
 #include <unordered_set>
 #include <vector>
 
+namespace daa {
+
 // Define the concept first, before using it in forward declarations
 // Concepts (C++20)
 template <typename T>
@@ -425,7 +427,7 @@ requires Hashable<V> class Graph {
 
     while (visited.size() < vertices_.size()) {
       const Vertex<V, E>& vertex = vertices_.at(current);
-      
+
       // Collect all unvisited neighbors and their distances
       std::vector<std::pair<std::size_t, E>> distances;
       for (const auto& [neighborId, edge] : vertex.edges()) {
@@ -439,8 +441,9 @@ requires Hashable<V> class Graph {
       }
 
       // Sort by distance
-      std::sort(distances.begin(), distances.end(), 
-                [](const auto& a, const auto& b) { return a.second < b.second; });
+      std::sort(distances.begin(), distances.end(), [](const auto& a, const auto& b) {
+        return a.second < b.second;
+      });
 
       // Select the middle element
       size_t midIndex = distances.size() / 2;
@@ -528,3 +531,5 @@ requires Hashable<V> class Graph {
     }
   }
 };
+
+}  // namespace daa

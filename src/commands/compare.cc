@@ -3,13 +3,13 @@
 
 #include <CLI/CLI.hpp>
 
-#include "benchmarking.h"
 #include "commands.h"
 #include "config.h"
 #include "time_utils.h"
-#include "tsp.h"
 
 #include "commands/compare.h"
+
+namespace daa {
 
 bool CompareCommand::execute() {
   try {
@@ -27,8 +27,9 @@ bool CompareCommand::execute() {
       for (const auto& algo : all_algos) {
         try {
           // Test if it's a TSP algorithm
-          AlgorithmRegistry::createTyped<Graph<City, double>, Path>(algo);
-          tsp_algos.push_back(algo);
+          // AlgorithmRegistry::createTyped<Graph<City, double>, Path>(algo);
+          // tsp_algos.push_back(algo);
+          // TODO: Add algorithms
         } catch (...) {
           // Not a TSP algorithm, skip it
           continue;
@@ -76,9 +77,12 @@ bool CompareCommand::execute() {
 
     // Use either files or generated data
     if (!input_files_.empty()) {
-      compare_algorithms_with_files(algo_names_, iterations_, input_files_, debug_, time_limit_ms_);
+      throw new std::runtime_error("TODO");
+      // compare_algorithms_with_files(algo_names_, iterations_, input_files_, debug_,
+      // time_limit_ms_);
     } else {
-      compare_algorithms(algo_names_, iterations_, test_sizes_, debug_, time_limit_ms_);
+      throw new std::runtime_error("TODO");
+      // compare_algorithms(algo_names_, iterations_, test_sizes_, debug_, time_limit_ms_);
     }
 
     if (verbose_) {
@@ -192,3 +196,4 @@ void CompareCommand::registerCommand(CommandRegistry& registry) {
     }
   );
 }
+}  // namespace daa

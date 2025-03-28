@@ -6,6 +6,8 @@
 #include <stdexcept>
 #include <string>
 
+namespace daa {
+
 namespace time_utils {
 
 /**
@@ -96,3 +98,4 @@ inline std::string formatMsToTimeString(int ms) {
 }
 
 }  // namespace time_utils
+}  // namespace daa

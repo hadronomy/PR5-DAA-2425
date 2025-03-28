@@ -7,6 +7,8 @@
 
 #include "command_registry.h"
 
+namespace daa {
+
 /**
  * @class Application
  * @brief Main application class that encapsulates CLI setup and execution
@@ -91,3 +93,5 @@ class Application {
   Application(const std::string& name, const std::string& description);
   void setupCommands();
 };
+
+}  // namespace daa

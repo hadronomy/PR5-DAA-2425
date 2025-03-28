@@ -5,6 +5,8 @@
 #include "command_handler.h"
 #include "command_registry.h"
 
+namespace daa {
+
 /**
  * Command handler for listing available algorithms
  */
@@ -19,3 +21,5 @@ class ListAlgorithmsCommand : public CommandHandler {
    */
   static void registerCommand(CommandRegistry& registry);
 };
+
+}  // namespace daa

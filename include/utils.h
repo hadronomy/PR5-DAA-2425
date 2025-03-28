@@ -1,6 +1,8 @@
 #include <filesystem>
 #include <string>
 
+namespace daa {
+
 #ifdef _WIN32
 #if defined(_WIN32)
 // To avoid conflicting windows.h symbols with raylib, some flags are defined
@@ -109,3 +111,5 @@ inline std::filesystem::path GetExecutablePath() {
 #endif
   return std::filesystem::path(path);
 }
+
+}  // namespace daa

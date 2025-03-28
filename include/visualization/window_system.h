@@ -3,6 +3,9 @@
 #include <string>
 #include "imgui.h"
 
+namespace daa {
+namespace visualization {
+
 class WindowSystem {
  public:
   WindowSystem();
@@ -25,3 +28,6 @@ class WindowSystem {
   ImGuiID dockspace_id_;
   std::string ini_filename_;
 };
+
+}  // namespace visualization
+}  // namespace daa

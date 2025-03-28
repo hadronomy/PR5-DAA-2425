@@ -10,6 +10,8 @@
 
 #include "ui.h"
 
+namespace daa {
+
 // Forward declaration
 template <typename T>
 class DataGenerator;
@@ -279,3 +281,5 @@ class AlgorithmRegistry {
 // Helper macro for algorithm registration
 #define REGISTER_ALGORITHM(className, name) \
   static bool className##_registered = AlgorithmRegistry::registerAlgorithm<className>(name)
+
+}  // namespace daa

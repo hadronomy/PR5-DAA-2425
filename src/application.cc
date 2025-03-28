@@ -1,12 +1,13 @@
 #include "application.h"
 
 #include "algorithms.h"  // Include this first to trigger static registration
-#include "algorithms/algorithm_registry_setup.h"
 #include "commands.h"
 #include "ui.h"
 
+namespace daa {
+
 Application Application::create(const std::string& name, const std::string& description) {
-  setup_algorithm_registry();
+  // setup_algorithm_registry();
 
   auto algorithms = AlgorithmRegistry::availableAlgorithms();
   if (algorithms.empty()) {
@@ -39,7 +40,7 @@ Application& Application::withStandardCommands() {
 
 int Application::run(int argc, char** argv) {
   // Setup algorithm registry
-  setup_algorithm_registry();
+  // setup_algorithm_registry();
 
   // Set up help flags
   app_.set_help_flag("-h,--help", "Display help information");
@@ -89,3 +90,5 @@ void Application::setupCommands() {
     }
   }
 }
+
+}  // namespace daa

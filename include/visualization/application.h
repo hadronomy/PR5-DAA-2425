@@ -8,6 +8,9 @@
 #include "visualization/ui_components.h"
 #include "visualization/window_system.h"
 
+namespace daa {
+namespace visualization {
+
 class VisApplication {
  public:
   VisApplication();
@@ -34,3 +37,6 @@ class VisApplication {
   void SetupImGui();
   void RenderFrame();
 };
+
+}  // namespace visualization
+}  // namespace daa

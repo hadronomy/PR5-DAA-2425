@@ -2,6 +2,9 @@
 #include <iostream>
 #include <vector>
 
+namespace daa {
+namespace visualization {
+
 // Theme implementations
 void ComfortableDarkCyanTheme::Apply() const {
   // Comfortable Dark Cyan style by SouthCraftX from ImThemes
@@ -327,3 +330,6 @@ void ImGuiThemeManager::SetDefaultFont(float size) {
 ImFont* ImGuiThemeManager::GetFont(const std::string& fontName) const {
   return fontManager.GetFont(fontName);
 }
+
+}  // namespace visualization
+}  // namespace daa

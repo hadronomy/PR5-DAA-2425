@@ -6,6 +6,9 @@
 #include "imgui.h"
 #include "raymath.h"
 
+namespace daa {
+namespace visualization {
+
 ObjectManager::ObjectManager() {}
 
 ObjectManager::~ObjectManager() {}
@@ -206,3 +209,6 @@ void ObjectManager::RenderControlWindow(bool* p_open) {
 
   ImGui::End();
 }
+
+}  // namespace visualization
+}  // namespace daa

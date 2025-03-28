@@ -11,14 +11,14 @@
 
 class TSPDriver {
  public:
-  Graph<std::string, int> graph;
+  daa::Graph<std::string, int> graph;
   SourceManager source_mgr;
   DiagnosticEngine diagnostic;
   std::unique_ptr<yy::tsp_lexer> lexer;
   std::unordered_map<std::string, std::size_t> node_ids;
   int expected_node_count = 0;
 
-  TSPDriver() : graph(GraphType::Undirected), diagnostic(source_mgr) {}
+  TSPDriver() : graph(daa::GraphType::Undirected), diagnostic(source_mgr) {}
 
   bool parse_file(const std::string& filename) {
     source_mgr.load_file(filename);

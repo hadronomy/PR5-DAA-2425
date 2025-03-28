@@ -9,6 +9,8 @@
 #include "command_handler.h"
 #include "command_registry.h"
 
+namespace daa {
+
 /**
  * Command handler for compare command
  * Compares performance of multiple algorithms
@@ -47,3 +49,5 @@ class CompareCommand : public CommandHandler {
   bool debug_;
   int time_limit_ms_;
 };
+
+}  // namespace daa

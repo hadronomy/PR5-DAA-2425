@@ -16,6 +16,8 @@
 
 #include "config.h"
 
+namespace daa {
+
 /**
  * @class UI
  * @brief Contains methods for formatted UI output
@@ -359,3 +361,5 @@ class UI {
     std::cout << table << std::endl;
   }
 };
+
+}  // namespace daa

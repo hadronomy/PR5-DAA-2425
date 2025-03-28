@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 
+namespace daa {
 namespace units {
 // Distance
 constexpr double meters_to_kilometers = 0.001;
@@ -595,3 +596,5 @@ class VRPTSWTSRouter {
     return routes;
   }
 };
+
+}  // namespace daa

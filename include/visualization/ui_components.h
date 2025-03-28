@@ -4,6 +4,9 @@
 #include "visualization/canvas.h"
 #include "visualization/object_manager.h"
 
+namespace daa {
+namespace visualization {
+
 class UIComponents {
  public:
   UIComponents(ObjectManager* object_manager, Canvas* canvas);
@@ -34,3 +37,6 @@ class UIComponents {
   bool show_shader_debug_ = false;
   Color clear_color_;
 };
+
+}  // namespace visualization
+}  // namespace daa

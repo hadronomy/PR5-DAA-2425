@@ -3,6 +3,9 @@
 #include "raymath.h"
 #include "rlImGui.h"
 
+namespace daa {
+namespace visualization {
+
 Canvas::Canvas(int width, int height, ObjectManager* object_manager)
     : width_(width),
       height_(height),
@@ -352,7 +355,7 @@ void Canvas::RenderWindow() {
       ImGui::Unindent(10);
 
       ImGui::Spacing();
-      
+
       // Mouse position information
       ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.8f, 1.0f), "Mouse Coordinates:");
       ImGui::Indent(10);
@@ -368,11 +371,11 @@ void Canvas::RenderWindow() {
       ImGui::Unindent(10);
 
       ImGui::Spacing();
-      
+
       // Camera control buttons
       ImGui::TextColored(ImVec4(0.5f, 0.8f, 0.8f, 1.0f), "Camera Controls:");
       ImGui::Indent(10);
-      
+
       if (ImGui::Button("Reset Camera", ImVec2(120, 0))) {
         camera_.target = Vector2{0, 0};
         camera_.offset = Vector2{width_ / 2.0f, height_ / 2.0f};
@@ -395,3 +398,6 @@ void Canvas::RenderWindow() {
 
   ImGui::End();  // End of "Canvas" window
 }
+
+}  // namespace visualization
+}  // namespace daa

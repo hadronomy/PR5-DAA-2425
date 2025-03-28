@@ -10,6 +10,9 @@
 #include "visualization/imgui_theme.h"
 #include "visualization/window_system.h"
 
+namespace daa {
+namespace visualization {
+
 WindowSystem::WindowSystem() : first_frame_(true), dockspace_id_(0) {
   std::string exe_dir = GetExecutablePath().parent_path().string();
   ini_filename_ = exe_dir + "/resources/layouts/imgui.ini";
@@ -217,3 +220,6 @@ void WindowSystem::FocusWindowByName(const char* window_name) {
     }
   }
 }
+
+}  // namespace visualization
+}  // namespace daa

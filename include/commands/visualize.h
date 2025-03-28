@@ -7,6 +7,8 @@
 #include "command_handler.h"
 #include "command_registry.h"
 
+namespace daa {
+
 /**
  * Command handler for visualize command
  * Opens a visualization window using Dear ImGui
@@ -25,3 +27,5 @@ class VisualizeCommand : public CommandHandler {
  private:
   std::string path_;
 };
+
+}  // namespace daa

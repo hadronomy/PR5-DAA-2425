@@ -3,6 +3,9 @@
 #include "raylib.h"
 #include "visualization/object_manager.h"
 
+namespace daa {
+namespace visualization {
+
 class Canvas {
  public:
   Canvas(int width, int height, ObjectManager* object_manager);
@@ -70,3 +73,6 @@ class Canvas {
   // Helper method for setting matrix uniforms
   void SetShaderValueMatrix3x3(Shader shader, int locIndex, float* mat);
 };
+
+}  // namespace visualization
+}  // namespace daa

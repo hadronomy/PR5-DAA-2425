@@ -12,6 +12,8 @@
 
 #include "command_handler.h"
 
+namespace daa {
+
 /**
  * @class CommandRegistry
  * @brief Registry for CLI commands with factory methods
@@ -146,3 +148,5 @@ class CommandRegistry {
   std::unordered_map<std::string, std::string> commandInfo_;
   std::unordered_map<std::string, SimpleCommandHandler> simpleCommands_;
 };
+
+}  // namespace daa

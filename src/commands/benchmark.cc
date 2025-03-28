@@ -1,5 +1,4 @@
 
-#include "benchmarking.h"
 #include "ui.h"
 
 #include "commands/benchmark.h"
@@ -9,6 +8,8 @@
 #include "commands.h"
 #include "config.h"
 #include "time_utils.h"
+
+namespace daa {
 
 bool BenchmarkCommand::execute() {
   try {
@@ -42,9 +43,11 @@ bool BenchmarkCommand::execute() {
 
     // Use either files or generated data
     if (!input_files_.empty()) {
-      run_benchmark_with_files(algo_name_, iterations_, input_files_, debug_, time_limit_ms_);
+      throw new std::runtime_error("TODO");
+      // run_benchmark_with_files(algo_name_, iterations_, input_files_, debug_, time_limit_ms_);
     } else {
-      run_benchmark(algo_name_, iterations_, test_sizes_, debug_, time_limit_ms_);
+      throw new std::runtime_error("TODO");
+      // run_benchmark(algo_name_, iterations_, test_sizes_, debug_, time_limit_ms_);
     }
 
     if (verbose_) {
@@ -125,3 +128,4 @@ void BenchmarkCommand::registerCommand(CommandRegistry& registry) {
     }
   );
 }
+}  // namespace daa

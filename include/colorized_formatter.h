@@ -9,6 +9,8 @@
 
 #include "config.h"
 
+namespace daa {
+
 /**
  * @class ColorizedFormatter
  * @brief Custom formatter for CLI11 help text with enhanced colorization
@@ -217,3 +219,5 @@ class ColorizedFormatter : public CLI::Formatter {
 
   const std::string root_name(const CLI::App* app) const { return root(app)->get_name(); }
 };
+
+}  // namespace daa

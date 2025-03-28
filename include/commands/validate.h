@@ -5,6 +5,8 @@
 #include "command_handler.h"
 #include "command_registry.h"
 
+namespace daa {
+
 /**
  * Command handler for help command
  * Displays usage information about the application
@@ -23,3 +25,5 @@ class ValidateCommand : public CommandHandler {
  private:
   std::string path_;
 };
+
+}  // namespace daa

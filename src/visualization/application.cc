@@ -1,6 +1,9 @@
 #include "visualization/application.h"
 #include "rlImGui.h"
 
+namespace daa {
+namespace visualization {
+
 VisApplication::VisApplication()
     : screen_width_(1280), screen_height_(720), clear_color_(DARKGRAY), running_(false) {}
 
@@ -97,3 +100,6 @@ void VisApplication::Shutdown() {
     CloseWindow();
   }
 }
+
+}  // namespace visualization
+}  // namespace daa

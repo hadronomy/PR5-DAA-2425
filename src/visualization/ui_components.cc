@@ -2,6 +2,9 @@
 #include "imgui.h"
 #include "visualization/imgui_theme.h"
 
+namespace daa {
+namespace visualization {
+
 UIComponents::UIComponents(ObjectManager* object_manager, Canvas* canvas)
     : object_manager_(object_manager),
       canvas_(canvas),
@@ -62,27 +65,27 @@ void UIComponents::RenderLeftPanel() {
 
 void UIComponents::RenderRightPanel() {
   ImGui::Begin("Right Panel");
-  
+
   // Title with styling
   ImGui::PushFont(GetThemeManager().GetFont("Geist"));
   ImGui::TextColored(ImVec4(0.65f, 0.65f, 1.0f, 1.0f), "Performance Monitor");
   ImGui::PopFont();
-  
+
   ImGui::Separator();
-  
+
   // Performance stats with better formatting
   ImGuiIO& io = ImGui::GetIO();
-  
+
   // Collect frame time history
   static float frameTimes[120] = {};
   static float fpsTimes[120] = {};
   static int valuesOffset = 0;
-  
+
   // Update values
   frameTimes[valuesOffset] = 1000.0f / io.Framerate;
   fpsTimes[valuesOffset] = io.Framerate;
   valuesOffset = (valuesOffset + 1) % IM_ARRAYSIZE(frameTimes);
-  
+
   // Calculate stats
   float frameTimeAvg = 0.0f;
   float fpsAvg = 0.0f;
@@ -92,42 +95,55 @@ void UIComponents::RenderRightPanel() {
   }
   frameTimeAvg /= (float)IM_ARRAYSIZE(frameTimes);
   fpsAvg /= (float)IM_ARRAYSIZE(fpsTimes);
-  
+
   // Display current values
   ImGui::BeginGroup();
-  ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Current Frame Time: %.2f ms", 1000.0f / io.Framerate);
+  ImGui::TextColored(
+    ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Current Frame Time: %.2f ms", 1000.0f / io.Framerate
+  );
   ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "Current FPS: %.1f", io.Framerate);
   ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), "Raylib FPS: %d", GetFPS());
-  ImGui::TextColored(ImVec4(0.7f, 0.7f, 1.0f, 1.0f), "Average: %.2f ms/frame (%.1f FPS)", frameTimeAvg, fpsAvg);
+  ImGui::TextColored(
+    ImVec4(0.7f, 0.7f, 1.0f, 1.0f), "Average: %.2f ms/frame (%.1f FPS)", frameTimeAvg, fpsAvg
+  );
   ImGui::EndGroup();
-  
+
   ImGui::Spacing();
-  
+
   // FPS Graph
   ImGui::Text("FPS History");
   char overlay[32];
   sprintf(overlay, "%.1f FPS", io.Framerate);
-  ImGui::PlotLines("##fps", fpsTimes, IM_ARRAYSIZE(fpsTimes), valuesOffset, 
-                   overlay, 0.0f, 200.0f, ImVec2(0, 80));
-  
+  ImGui::PlotLines(
+    "##fps", fpsTimes, IM_ARRAYSIZE(fpsTimes), valuesOffset, overlay, 0.0f, 200.0f, ImVec2(0, 80)
+  );
+
   // Frame time graph
   ImGui::Text("Frame Time History");
   sprintf(overlay, "%.2f ms", 1000.0f / io.Framerate);
-  ImGui::PlotLines("##frametime", frameTimes, IM_ARRAYSIZE(frameTimes), valuesOffset, 
-                   overlay, 0.0f, 40.0f, ImVec2(0, 80));
-                   
+  ImGui::PlotLines(
+    "##frametime",
+    frameTimes,
+    IM_ARRAYSIZE(frameTimes),
+    valuesOffset,
+    overlay,
+    0.0f,
+    40.0f,
+    ImVec2(0, 80)
+  );
+
   // System info section
   if (ImGui::CollapsingHeader("System Information")) {
     ImGui::TextWrapped("Resolution: %dx%d", GetScreenWidth(), GetScreenHeight());
     ImGui::TextWrapped("GPU: %s", GetMonitorName(0));
   }
-  
+
   // Theme selector
   ImGui::Spacing();
   ImGui::Separator();
   ImGui::Text("Appearance");
   RenderThemeSelector();
-  
+
   ImGui::End();
 }
 
@@ -173,3 +189,6 @@ void UIComponents::RenderThemeSelector() {
     ImGui::EndCombo();
   }
 }
+
+}  // namespace visualization
+}  // namespace daa

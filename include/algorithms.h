@@ -15,8 +15,6 @@
 // Include core headers first
 // IWYU pragma: begin_exports
 #include "algorithm_registry.h"
-#include "graph.h"
-#include "tsp.h"
 // IWYU pragma: end_exports
 
 // Ensure all algorithms are registered at compile time
@@ -39,12 +37,7 @@ RegisterAlgorithms register_algorithms_instance;
 
 // Include algorithm implementations with direct registration
 // IWYU pragma: begin_exports
-#include "algorithms/brute_force_tsp.h"
-#include "algorithms/dynamic_programming_tsp.h"
-#include "algorithms/mid_neighbor_tsp.h"
-#include "algorithms/nearest_neighbor_tsp.h"
-#include "algorithms/simulated_annealing_tsp.h"
-#include "algorithms/two_opt_tsp.h"
+// TODO: Add all algorithm headers here
 // IWYU pragma: end_exports
 
 // Restore warning settings

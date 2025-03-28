@@ -2,8 +2,10 @@
 
 #include "visualization/application.h"
 
+namespace daa {
+
 bool VisualizeCommand::execute() {
-  VisApplication gui;
+  visualization::VisApplication gui;
 
   if (!gui.Initialize()) {
     if (verbose_) {
@@ -29,3 +31,5 @@ void VisualizeCommand::registerCommand(CommandRegistry& registry) {
     [](bool verbose) { return std::make_unique<VisualizeCommand>(verbose); }
   );
 }
+
+}  // namespace daa

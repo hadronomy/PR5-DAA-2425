@@ -6,6 +6,8 @@
 #include "command_handler.h"
 #include "command_registry.h"
 
+namespace daa {
+
 /**
  * Command handler for benchmark command
  * Benchmarks a single algorithm with specified options
@@ -49,3 +51,5 @@ class BenchmarkCommand : public CommandHandler {
   bool debug_;
   int time_limit_ms_;  // Time limit in milliseconds
 };
+
+}  // namespace daa
