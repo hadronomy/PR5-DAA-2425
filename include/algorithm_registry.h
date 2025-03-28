@@ -219,9 +219,7 @@ class AlgorithmRegistry {
   }
 
   // List all algorithms with their descriptions
-  static void listAlgorithms(std::ostream& os = std::cout) {
-    auto& registry = instance();
-
+  static void listAlgorithms(std::ostream& _ = std::cout) {
     // Use UI::header for the title
     UI::header("Available Algorithms");
 

@@ -675,7 +675,7 @@ struct BenchmarkResult {
 };
 
 template <typename F>
-FunctionKind get_function_kind(F&& f) {
+FunctionKind get_function_kind(F&& _) {
   if constexpr (std::is_invocable_v<F, std::map<std::string, double>, BenchmarkResult&>) {
     return FunctionKind::Function;
   } else if constexpr (std::is_invocable_v<F, std::map<std::string, double>>) {
@@ -757,7 +757,7 @@ class B {
   BenchmarkResult _last_result;
 
   B(std::string name, std::function<void(std::map<std::string, double>, BenchmarkResult&)> fn)
-      : _name(name), fn(fn), _kind(get_function_kind(fn)) {
+      : _name(name), _kind(get_function_kind(fn)), fn(fn) {
     if (_kind == FunctionKind::None) {
       throw std::runtime_error("expected function, generator or iterator");
     }
@@ -1782,7 +1782,7 @@ class runner {
               std::sort(
                 group_trials.begin(),
                 group_trials.end(),
-                [this, &stats](const auto& a, const auto& b) {
+                [this](const auto& a, const auto& b) {
                   double score_a = std::numeric_limits<double>::max();
                   double score_b = std::numeric_limits<double>::max();
 

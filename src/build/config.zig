@@ -14,10 +14,10 @@ pub const cppflags = [_][]const u8{
     "-DASIO_HAS_THREADS",
     "-fcolor-diagnostics",
     "-std=c++23",
-    // "-Wall",
-    // "-Wextra",
+    "-Wall",
+    "-Wextra",
     // "-Werror",
-    // "-Wpedantic",
+    "-Wpedantic",
     "-Wno-deprecated-declarations",
     "-Wno-unqualified-std-cast-call",
     "-Wno-bitwise-instead-of-logical", //for notcurses

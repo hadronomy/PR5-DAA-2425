@@ -325,6 +325,8 @@ void ImGuiThemeManager::SetFont(const std::string& fontName) {
 
 void ImGuiThemeManager::SetDefaultFont(float size) {
   fontManager.SetCurrentFont("Geist Mono");
+  ImGuiIO& io = ImGui::GetIO();
+  io.FontGlobalScale = size;
 }
 
 ImFont* ImGuiThemeManager::GetFont(const std::string& fontName) const {

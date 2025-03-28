@@ -53,10 +53,12 @@ void UIComponents::RenderLeftPanel() {
     };
 
     if (ImGui::ColorEdit3("Background Color", color)) {
-      clear_color_ = (Color){(unsigned char)(color[0] * 255),
-                             (unsigned char)(color[1] * 255),
-                             (unsigned char)(color[2] * 255),
-                             (unsigned char)(color[3] * 255)};
+      clear_color_ = Color{
+        (unsigned char)(color[0] * 255),
+        (unsigned char)(color[1] * 255),
+        (unsigned char)(color[2] * 255),
+        (unsigned char)(color[3] * 255)
+      };
     }
   }
 

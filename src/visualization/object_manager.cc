@@ -190,10 +190,12 @@ void ObjectManager::RenderControlWindow(bool* p_open) {
         obj.color.r / 255.0f, obj.color.g / 255.0f, obj.color.b / 255.0f, obj.color.a / 255.0f
       };
       if (ImGui::ColorEdit4("Color", color)) {
-        obj.color = (Color){(unsigned char)(color[0] * 255),
-                            (unsigned char)(color[1] * 255),
-                            (unsigned char)(color[2] * 255),
-                            (unsigned char)(color[3] * 255)};
+        obj.color = Color{
+          (unsigned char)(color[0] * 255),
+          (unsigned char)(color[1] * 255),
+          (unsigned char)(color[2] * 255),
+          (unsigned char)(color[3] * 255)
+        };
       }
 
       // Delete button

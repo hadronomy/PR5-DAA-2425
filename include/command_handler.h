@@ -35,7 +35,7 @@ class CommandHandler {
    *
    * @param registry The command registry to register with
    */
-  static void registerCommand(CommandRegistry& registry) {}
+  static void registerCommand(CommandRegistry& _) {}
 
  protected:
   /**
