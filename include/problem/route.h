@@ -3,6 +3,7 @@
 #include <ranges>
 #include <string>
 #include <vector>
+
 #include "kdtree.h"
 #include "location.h"
 #include "strong_types.h"
