@@ -148,7 +148,7 @@ class DiagnosticEngine {
       // Print line number with consistent padding and colored bar
       fmt::print(
         stderr,
-        "{} {} {} {}\n",
+        "{}{} {} {}\n",
         fmt::styled(fmt::format("{:>{}}", line_num, line_num_width), blue_style),
         fmt::styled("", blue_style),
         fmt::styled("│", blue_style),
@@ -160,7 +160,7 @@ class DiagnosticEngine {
         // Pointer line with margin
         fmt::print(
           stderr,
-          "{} {} ",
+          "{}{} ",
           fmt::styled(fmt::format("{:{}}", "", line_num_width + 1), blue_style),
           fmt::styled("│", blue_style)
         );
@@ -172,7 +172,7 @@ class DiagnosticEngine {
         std::string carets(snippet.error_length + 1, '^');
         fmt::print(
           stderr,
-          "{} {}\n",
+          "{}{}\n",
           fmt::styled(carets, get_style(AnsiColor::RED)),
           fmt::styled("→ here", get_style(AnsiColor::YELLOW))
         );
@@ -180,7 +180,7 @@ class DiagnosticEngine {
         // Add an empty line after error indication
         fmt::print(
           stderr,
-          "{} {}\n",
+          "{}{}\n",
           fmt::styled(fmt::format("{:{}}", "", line_num_width + 1), blue_style),
           fmt::styled("│", blue_style)
         );
