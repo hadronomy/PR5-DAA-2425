@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <string_view>
+
 #include "imgui.h"
 
 namespace daa {
@@ -15,7 +17,8 @@ class WindowSystem {
   void BeginFrame();
   void EndFrame();
   bool ShouldClose() const;
-  void FocusWindowByName(const char* window_name);
+  void FocusWindowByName(std::string_view window_name, bool force_focus = false);
+  void CheckMouseButtonsForCanvas();
 
  private:
   void SetupDocking();

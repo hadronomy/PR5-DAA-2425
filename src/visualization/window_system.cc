@@ -75,12 +75,14 @@ void WindowSystem::BeginFrame() {
   }
 
   // Check for mouse wheel activity and focus canvas if needed
-  // This needs to be done before creating the dockspace
   float wheel = GetMouseWheelMove();
   if (wheel != 0) {
     // Try to find and focus the Canvas window automatically when scrolling
-    FocusWindowByName("Canvas");
+    FocusWindowByName("Canvas", false);  // Use hover check for wheel activity
   }
+
+  // Check for mouse buttons and focus canvas if needed
+  CheckMouseButtonsForCanvas();
 
   // Create dockspace every frame
   CreateDockspace();
@@ -205,19 +207,30 @@ void WindowSystem::ConfigureImGuiStyle() {
   GetThemeManager().ApplyTheme("Comfortable Dark Cyan");
 }
 
-void WindowSystem::FocusWindowByName(const char* window_name) {
+void WindowSystem::FocusWindowByName(std::string_view window_name, bool force_focus) {
   // Find the window by name
-  ImGuiWindow* window = ImGui::FindWindowByName(window_name);
+  ImGuiWindow* window = ImGui::FindWindowByName(window_name.data());
   if (window && !window->Collapsed) {
-    // Check if the mouse is hovering over this window
+    // Check if we should force focus or if the mouse is hovering over this window
     ImVec2 mouse_pos = ImGui::GetIO().MousePos;
-    if (mouse_pos.x >= window->Pos.x && mouse_pos.x <= window->Pos.x + window->Size.x &&
-        mouse_pos.y >= window->Pos.y && mouse_pos.y <= window->Pos.y + window->Size.y) {
+    bool is_hovering =
+      mouse_pos.x >= window->Pos.x && mouse_pos.x <= window->Pos.x + window->Size.x &&
+      mouse_pos.y >= window->Pos.y && mouse_pos.y <= window->Pos.y + window->Size.y;
+
+    if (force_focus || is_hovering) {
       // Focus this window and handle scroll events
-      ImGui::SetWindowFocus(window_name);
+      ImGui::SetWindowFocus(window_name.data());
       // Temporarily disable capture for other windows
       ImGui::GetIO().WantCaptureMouse = false;
     }
+  }
+}
+
+void WindowSystem::CheckMouseButtonsForCanvas() {
+  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) ||
+      IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
+    // When any mouse button is pressed, try to focus the Canvas
+    FocusWindowByName("Canvas", false);  // Use hover check
   }
 }
 

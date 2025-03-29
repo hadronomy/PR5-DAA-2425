@@ -265,14 +265,109 @@ void Canvas::UpdateRenderTexture() {
   DrawTextEx(
     GetFontDefault(),
     TextFormat("[%i, %i]", (int)world_mouse_pos.x, (int)world_mouse_pos.y),
-    Vector2Add(world_mouse_pos, (Vector2){-44, -24}),
+    Vector2Add(
+      world_mouse_pos,
+      Vector2{
+        -44,
+        -24,
+      }
+    ),
     20,
     2,
     BLACK
   );
 
+  // Draw the scale legend
+  DrawScaleLegend();
+
   EndMode2D();
   EndTextureMode();
+}
+
+void Canvas::DrawScaleLegend() {
+  // Define constants for the scale legend
+  const int legendWidth = 100;  // Fixed screen-space width of the legend
+  const int padding = 20;       // Padding from the edge of the screen
+  const int thickness = 2;      // Line thickness
+  const int tickHeight = 5;     // Height of tick marks
+  const int textPadding = 5;    // Padding between line and text
+  const Color lineColor = WHITE;
+  const Color textColor = WHITE;
+
+  // Calculate a nice round scale value based on zoom level
+  float worldUnitsPerLegend = legendWidth / camera_.zoom;
+
+  // Round to a "nice" number (1, 2, 5, 10, 20, 50, 100, etc.)
+  float magnitude = powf(10.0f, floorf(log10f(worldUnitsPerLegend)));
+  float normalized = worldUnitsPerLegend / magnitude;
+
+  // Choose a nice multiplier: 1, 2, 5
+  float multiplier = 1.0f;
+  if (normalized >= 1.0f && normalized < 2.0f)
+    multiplier = 1.0f;
+  else if (normalized >= 2.0f && normalized < 5.0f)
+    multiplier = 2.0f;
+  else if (normalized >= 5.0f)
+    multiplier = 5.0f;
+
+  float niceScale = multiplier * magnitude;
+
+  // Calculate the actual pixel length based on the nice scale
+  float actualLength = niceScale * camera_.zoom;
+
+  // Calculate top-right corner position in screen space (regardless of camera)
+  Vector2 screenPos = {(float)width_ - padding - actualLength, (float)padding};
+
+  // We need to draw this in screen space, outside of the camera's transformation
+  EndMode2D();  // End the camera transformation
+
+  // Draw the main scale line
+  DrawLineEx(screenPos, Vector2{screenPos.x + actualLength, screenPos.y}, thickness, lineColor);
+
+  // Draw tick marks at both ends
+  DrawLineEx(
+    screenPos,
+    Vector2{
+      screenPos.x,
+      screenPos.y + tickHeight,
+    },
+    thickness,
+    lineColor
+  );
+  DrawLineEx(
+    Vector2{
+      screenPos.x + actualLength,
+      screenPos.y,
+    },
+    Vector2{
+      screenPos.x + actualLength,
+      screenPos.y + tickHeight,
+    },
+    thickness,
+    lineColor
+  );
+
+  // Draw scale text
+  const char* scaleText;
+  if (niceScale >= 1000) {
+    scaleText = TextFormat("%.1f km", niceScale / 1000.0f);
+  } else if (niceScale >= 1) {
+    scaleText = TextFormat("%.0f m", niceScale);
+  } else {
+    scaleText = TextFormat("%.0f cm", niceScale * 100.0f);
+  }
+
+  // Calculate text position centered below the line
+  Vector2 textSize = MeasureTextEx(GetFontDefault(), scaleText, 10, 1);
+  Vector2 textPos = {
+    screenPos.x + (actualLength - textSize.x) / 2, screenPos.y + tickHeight + textPadding
+  };
+
+  // Draw the text
+  DrawTextEx(GetFontDefault(), scaleText, textPos, 10, 1, textColor);
+
+  // Resume camera mode for subsequent drawing
+  BeginMode2D(camera_);
 }
 
 void Canvas::RenderWindow() {

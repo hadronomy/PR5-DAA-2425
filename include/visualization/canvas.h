@@ -69,6 +69,7 @@ class Canvas {
   void DrawGrid();  // Kept for compatibility
   void HandleZooming(const Vector2& mouse_pos);
   void HandlePanning(const Vector2& mouse_pos);
+  void DrawScaleLegend();  // New method for drawing the scale legend
 
   // Helper method for setting matrix uniforms
   void SetShaderValueMatrix3x3(Shader shader, int locIndex, float* mat);
