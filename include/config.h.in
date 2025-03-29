@@ -32,7 +32,7 @@ constexpr auto usage = fmt::rgb(148, 226, 213);            // Teal
 namespace symbols {
 constexpr auto success = "✓";
 constexpr auto error = "✗";
-constexpr auto warning = "⚠";
+constexpr auto warning = "!";
 constexpr auto info = "ℹ";
 constexpr auto arrow = "→";
 }  // namespace symbols
