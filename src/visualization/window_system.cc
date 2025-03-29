@@ -42,7 +42,7 @@ bool WindowSystem::Initialize(int width, int height, const char* title) {
 
   // Configure ImGui to save window positions and sizes
   ImGuiIO& io = ImGui::GetIO();
-  io.IniFilename = ini_filename_.c_str();
+  io.IniFilename = nullptr;
 
   // Make sure docking is properly enabled with necessary flags
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
