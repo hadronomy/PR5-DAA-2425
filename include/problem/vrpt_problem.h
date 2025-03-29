@@ -34,7 +34,7 @@ class VRPTProblem {
   double map_height_{0.0};         // Map height (Ly)
   Capacity cv_capacity_{0.0};      // Q1: Collection vehicle capacity
   Capacity tv_capacity_{0.0};      // Q2: Transportation vehicle capacity
-  double vehicle_speed_{0.0};      // V: Vehicle speed (km/h)
+  Speed vehicle_speed_{0.0, units::DistanceUnit::Kilometers, units::TimeUnit::Hours};      // V: Vehicle speed (km/h)
   double epsilon_{0.0};            // Epsilon parameter
   double offset_{0.0};             // Offset parameter
   int k_param_{0};                 // k parameter
@@ -92,7 +92,7 @@ class VRPTProblem {
       map_height_ = driver.parameters.map_height;
       cv_capacity_ = Capacity{driver.parameters.q1};
       tv_capacity_ = Capacity{driver.parameters.q2};
-      vehicle_speed_ = driver.parameters.vehicle_speed;
+      vehicle_speed_ = Speed{driver.parameters.vehicle_speed, units::DistanceUnit::Kilometers, units::TimeUnit::Hours,};
       epsilon_ = driver.parameters.epsilon;
       offset_ = driver.parameters.offset;
       k_param_ = driver.parameters.k_param;
@@ -178,7 +178,7 @@ class VRPTProblem {
   [[nodiscard]] int getNumZones() const noexcept { return num_zones_; }
   [[nodiscard]] Capacity getCVCapacity() const noexcept { return cv_capacity_; }
   [[nodiscard]] Capacity getTVCapacity() const noexcept { return tv_capacity_; }
-  [[nodiscard]] double getVehicleSpeed() const noexcept { return vehicle_speed_; }
+  [[nodiscard]] Speed getVehicleSpeed() const noexcept { return vehicle_speed_; }
 
   /**
    * @brief Get the depot location

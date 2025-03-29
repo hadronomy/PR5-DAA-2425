@@ -31,6 +31,13 @@ concept DistanceConvertible = requires(T d) {
   { d.miles() } -> std::convertible_to<double>;
 };
 
+template <typename T>
+concept SpeedConvertible = requires(T s) {
+  { s.metersPerSecond() } -> std::convertible_to<double>;
+  { s.kilometersPerHour() } -> std::convertible_to<double>;
+  { s.milesPerHour() } -> std::convertible_to<double>;
+};
+
 enum class LocationType { DEPOT, COLLECTION_ZONE, SWTS, LANDFILL };
 
 template <typename T>
