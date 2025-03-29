@@ -6,13 +6,12 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <optional>
 
 #include "concepts.h"
 #include "kdtree.h"
 #include "location.h"
-#include "strong_types.h"
 #include "parser/vrpt_driver.h"
+#include "strong_types.h"
 
 namespace daa {
 
@@ -32,10 +31,14 @@ class VRPTProblem {
   double map_height_{0.0};         // Map height (Ly)
   Capacity cv_capacity_{0.0};      // Q1: Collection vehicle capacity
   Capacity tv_capacity_{0.0};      // Q2: Transportation vehicle capacity
-  Speed vehicle_speed_{0.0, units::DistanceUnit::Kilometers, units::TimeUnit::Hours};      // V: Vehicle speed (km/h)
-  double epsilon_{0.0};            // Epsilon parameter
-  double offset_{0.0};             // Offset parameter
-  int k_param_{0};                 // k parameter
+  Speed vehicle_speed_{
+    0.0,
+    units::DistanceUnit::Kilometers,
+    units::TimeUnit::Hours
+  };  // V: Vehicle speed (km/h)
+  double epsilon_{0.0};  // Epsilon parameter
+  double offset_{0.0};   // Offset parameter
+  int k_param_{0};       // k parameter
 
   // KDTree for spatial queries
   KDTree location_tree_;
@@ -90,7 +93,11 @@ class VRPTProblem {
       map_height_ = driver.parameters.map_height;
       cv_capacity_ = Capacity{driver.parameters.q1};
       tv_capacity_ = Capacity{driver.parameters.q2};
-      vehicle_speed_ = Speed{driver.parameters.vehicle_speed, units::DistanceUnit::Kilometers, units::TimeUnit::Hours,};
+      vehicle_speed_ = Speed{
+        driver.parameters.vehicle_speed,
+        units::DistanceUnit::Kilometers,
+        units::TimeUnit::Hours,
+      };
       epsilon_ = driver.parameters.epsilon;
       offset_ = driver.parameters.offset;
       k_param_ = driver.parameters.k_param;
@@ -100,14 +107,14 @@ class VRPTProblem {
         if (loc.type == "Depot") {
           depot_id_ = "depot";
           auto depot = Location::Builder()
-                        .setId(depot_id_)
-                        .setCoordinates(loc.x, loc.y)
-                        .setType(LocationType::DEPOT)
-                        .setName("Depot")
-                        .setServiceTime(Duration{0.0})
-                        .setWasteAmount(Capacity{0.0})
-                        .build();
-          
+                         .setId(depot_id_)
+                         .setCoordinates(loc.x, loc.y)
+                         .setType(LocationType::DEPOT)
+                         .setName("Depot")
+                         .setServiceTime(Duration{0.0})
+                         .setWasteAmount(Capacity{0.0})
+                         .build();
+
           locations.push_back(depot);
         } else if (loc.type == "Dumpsite") {
           landfill_id_ = "landfill";
@@ -119,7 +126,7 @@ class VRPTProblem {
                             .setServiceTime(Duration{0.0})
                             .setWasteAmount(Capacity{0.0})
                             .build();
-          
+
           locations.push_back(landfill);
         } else if (loc.type == "IF" || loc.type == "IF1") {
           std::string swts_id = "swts_" + loc.type;
@@ -131,7 +138,7 @@ class VRPTProblem {
                         .setServiceTime(Duration{0.0})
                         .setWasteAmount(Capacity{0.0})
                         .build();
-          
+
           locations.push_back(swts);
           swts_ids_.push_back(swts_id);
         }
@@ -148,7 +155,7 @@ class VRPTProblem {
                           .setServiceTime(Duration{zone.service_time, units::TimeUnit::Seconds})
                           .setWasteAmount(Capacity{zone.waste_amount})
                           .build();
-        
+
         locations.push_back(zone_loc);
         zone_ids_.push_back(id);
       }
@@ -209,14 +216,14 @@ class VRPTProblem {
   [[nodiscard]] std::vector<Location> getSWTS() const {
     std::vector<Location> result;
     const auto& locations = location_tree_.getLocations();
-    
+
     for (const auto& id : swts_ids_) {
       auto it = locations.find(id);
       if (it != locations.end()) {
         result.push_back(it->second);
       }
     }
-    
+
     return result;
   }
 
@@ -227,14 +234,14 @@ class VRPTProblem {
   [[nodiscard]] std::vector<Location> getZones() const {
     std::vector<Location> result;
     const auto& locations = location_tree_.getLocations();
-    
+
     for (const auto& id : zone_ids_) {
       auto it = locations.find(id);
       if (it != locations.end()) {
         result.push_back(it->second);
       }
     }
-    
+
     return result;
   }
 
