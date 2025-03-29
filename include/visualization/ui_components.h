@@ -1,41 +1,51 @@
 #pragma once
 
-#include "raylib.h"
-#include "visualization/canvas.h"
+#include <string>
+
+#include "imgui.h"
+
 #include "visualization/object_manager.h"
+#include "visualization/problem_manager.h"
 
 namespace daa {
 namespace visualization {
 
 class UIComponents {
  public:
-  UIComponents(ObjectManager* object_manager, Canvas* canvas);
+  UIComponents(ObjectManager* object_manager);
   ~UIComponents();
 
-  void RenderMenuBar();
-  void RenderLeftPanel();
-  void RenderRightPanel();
-  void RenderMainWindows();
-  void RenderThemeSelector();
+  void Initialize();
+  void SetProblemManager(ProblemManager* problem_manager);
+  void ScanProblemsDirectory(const std::string& dir_path = "examples");
 
-  // State getters/setters
-  bool& ShowDemoWindow() { return show_demo_window_; }
-  bool& ShowAnotherWindow() { return show_another_window_; }
-  bool& ShowObjectWindow() { return show_object_window_; }
-  Color& GetClearColor() { return clear_color_; }
-  bool& ShowShaderDebug() { return show_shader_debug_; }
+  void RenderUI();
 
  private:
-  // References to other components
-  ObjectManager* object_manager_;
-  Canvas* canvas_;
+  // Window components
+  void RenderEmptyStateOverlay();
+  void RenderProblemSelector();
+  void RenderProblemInspector();
+  void RenderAlgorithmSelector();
+  void RenderWarningDialog(const char* title, const char* message, bool* p_open);
 
-  // UI state
-  bool show_demo_window_;
-  bool show_another_window_;
-  bool show_object_window_;
-  bool show_shader_debug_ = false;
-  Color clear_color_;
+  // Visualization
+  void RenderProblemVisualization();
+  void RenderDiagonalPattern(
+    const ImVec2& min,
+    const ImVec2& max,
+    ImU32 color,
+    float thickness,
+    float spacing
+  );
+
+  ObjectManager* object_manager_;
+  ProblemManager* problem_manager_;
+
+  bool show_problem_selector_;
+  bool show_problem_inspector_;
+  bool show_algorithm_selector_;
+  bool show_no_algorithm_warning_;
 };
 
 }  // namespace visualization

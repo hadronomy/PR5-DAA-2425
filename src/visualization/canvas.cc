@@ -121,6 +121,14 @@ Vector2 Canvas::WorldToScreen(const Vector2& world_pos) const {
   return GetWorldToScreen2D(world_pos, camera_);
 }
 
+Vector2 Canvas::CanvasToMeters(const Vector2& canvas_pos) const {
+  return Vector2{canvas_pos.x * CANVAS_UNIT_TO_METERS, canvas_pos.y * CANVAS_UNIT_TO_METERS};
+}
+
+Vector2 Canvas::MetersToCanvas(const Vector2& meters_pos) const {
+  return Vector2{meters_pos.x / CANVAS_UNIT_TO_METERS, meters_pos.y / CANVAS_UNIT_TO_METERS};
+}
+
 void Canvas::HandleInput(bool is_window_focused, bool is_window_hovered) {
   if (!is_window_focused || !is_window_hovered)
     return;
@@ -199,7 +207,7 @@ void Canvas::HandleZooming(const Vector2& mouse_pos) {
 
   // Apply zoom with logarithmic scaling for consistent zoom speed
   float scale = 0.2f * wheel;
-  camera_.zoom = Clamp(expf(logf(camera_.zoom) + scale), 0.125f, 10.0f);
+  camera_.zoom = Clamp(expf(logf(camera_.zoom) + scale), 0.00125f, 10000.0f);
 
   // After changing the zoom, we need to adjust the target to maintain the position
   // under the cursor
@@ -264,7 +272,11 @@ void Canvas::UpdateRenderTexture() {
   DrawCircleV(world_mouse_pos, 4, DARKGRAY);
   DrawTextEx(
     GetFontDefault(),
-    TextFormat("[%i, %i]", (int)world_mouse_pos.x, (int)world_mouse_pos.y),
+    TextFormat(
+      "[%i m, %i m]",
+      (int)(world_mouse_pos.x * CANVAS_UNIT_TO_METERS),
+      (int)(world_mouse_pos.y * CANVAS_UNIT_TO_METERS)
+    ),
     Vector2Add(
       world_mouse_pos,
       Vector2{
@@ -277,10 +289,15 @@ void Canvas::UpdateRenderTexture() {
     BLACK
   );
 
-  // Draw the scale legend
+  // End Mode2D before drawing the scale legend
+  EndMode2D();
+
+  // Draw the scale legend (which will handle its own Mode2D state)
   DrawScaleLegend();
 
-  EndMode2D();
+  // No need to call BeginMode2D again since DrawScaleLegend ends with BeginMode2D
+  // and we're ending Mode2D right after this anyway
+
   EndTextureMode();
 }
 
@@ -297,9 +314,12 @@ void Canvas::DrawScaleLegend() {
   // Calculate a nice round scale value based on zoom level
   float worldUnitsPerLegend = legendWidth / camera_.zoom;
 
+  // Apply scaling factor: canvas unit to meters conversion
+  float metersPerLegend = worldUnitsPerLegend * CANVAS_UNIT_TO_METERS;
+
   // Round to a "nice" number (1, 2, 5, 10, 20, 50, 100, etc.)
-  float magnitude = powf(10.0f, floorf(log10f(worldUnitsPerLegend)));
-  float normalized = worldUnitsPerLegend / magnitude;
+  float magnitude = powf(10.0f, floorf(log10f(metersPerLegend)));
+  float normalized = metersPerLegend / magnitude;
 
   // Choose a nice multiplier: 1, 2, 5
   float multiplier = 1.0f;
@@ -307,19 +327,20 @@ void Canvas::DrawScaleLegend() {
     multiplier = 1.0f;
   else if (normalized >= 2.0f && normalized < 5.0f)
     multiplier = 2.0f;
-  else if (normalized >= 5.0f)
+  else if (normalized >= 5.0f && normalized < 10.0f)
     multiplier = 5.0f;
 
-  float niceScale = multiplier * magnitude;
+  // Nice scale in meters
+  float niceScaleMeters = multiplier * magnitude;
+
+  // Convert back to canvas units for drawing
+  float niceScaleUnits = niceScaleMeters / CANVAS_UNIT_TO_METERS;
 
   // Calculate the actual pixel length based on the nice scale
-  float actualLength = niceScale * camera_.zoom;
+  float actualLength = niceScaleUnits * camera_.zoom;
 
   // Calculate top-right corner position in screen space (regardless of camera)
   Vector2 screenPos = {(float)width_ - padding - actualLength, (float)padding};
-
-  // We need to draw this in screen space, outside of the camera's transformation
-  EndMode2D();  // End the camera transformation
 
   // Draw the main scale line
   DrawLineEx(screenPos, Vector2{screenPos.x + actualLength, screenPos.y}, thickness, lineColor);
@@ -347,14 +368,14 @@ void Canvas::DrawScaleLegend() {
     lineColor
   );
 
-  // Draw scale text
+  // Draw scale text - using the meter scale for display
   const char* scaleText;
-  if (niceScale >= 1000) {
-    scaleText = TextFormat("%.1f km", niceScale / 1000.0f);
-  } else if (niceScale >= 1) {
-    scaleText = TextFormat("%.0f m", niceScale);
+  if (niceScaleMeters >= 1000) {
+    scaleText = TextFormat("%.1f km", niceScaleMeters / 1000.0f);
+  } else if (niceScaleMeters >= 1) {
+    scaleText = TextFormat("%.0f m", niceScaleMeters);
   } else {
-    scaleText = TextFormat("%.0f cm", niceScale * 100.0f);
+    scaleText = TextFormat("%.0f cm", niceScaleMeters * 100.0f);
   }
 
   // Calculate text position centered below the line
@@ -365,9 +386,6 @@ void Canvas::DrawScaleLegend() {
 
   // Draw the text
   DrawTextEx(GetFontDefault(), scaleText, textPos, 10, 1, textColor);
-
-  // Resume camera mode for subsequent drawing
-  BeginMode2D(camera_);
 }
 
 void Canvas::RenderWindow() {
@@ -462,7 +480,13 @@ void Canvas::RenderWindow() {
       Vector2 world_mouse_pos = ScreenToWorld(canvas_mouse_pos);
 
       ImGui::Text("Screen: (%.2f, %.2f)", canvas_mouse_pos.x, canvas_mouse_pos.y);
-      ImGui::Text("World:  (%.2f, %.2f)", world_mouse_pos.x, world_mouse_pos.y);
+      ImGui::Text(
+        "World:  (%.2f, %.2f) [%.2f m, %.2f m]",
+        world_mouse_pos.x,
+        world_mouse_pos.y,
+        world_mouse_pos.x * CANVAS_UNIT_TO_METERS,
+        world_mouse_pos.y * CANVAS_UNIT_TO_METERS
+      );
       ImGui::Unindent(10);
 
       ImGui::Spacing();
@@ -487,11 +511,33 @@ void Canvas::RenderWindow() {
       }
       ImGui::Unindent(10);
     }
-
-    ImGui::End();  // End of "Canvas Debug" window
   }
 
+  ImGui::End();  // End of "Canvas Debug" window
   ImGui::End();  // End of "Canvas" window
+}
+
+void Canvas::FitViewToBounds(const Rectangle& bounds, float padding) {
+  // Check if the bounds are valid
+  if (bounds.width <= 0 || bounds.height <= 0)
+    return;
+
+  // Calculate the scale factor to fit the bounds in the view
+  float scaleX = width_ / (bounds.width * (1.0f + padding * 2.0f));
+  float scaleY = height_ / (bounds.height * (1.0f + padding * 2.0f));
+
+  // Choose the smaller scale to ensure everything fits
+  float newZoom = fminf(scaleX, scaleY);
+
+  // Update the camera zoom with limits
+  camera_.zoom = Clamp(newZoom, 0.00125f, 10000.0f);
+
+  // Center the camera on the bounds
+  camera_.target.x = bounds.x + bounds.width / 2.0f;
+  camera_.target.y = bounds.y + bounds.height / 2.0f;
+
+  // Make sure camera gets updated
+  Update();
 }
 
 }  // namespace visualization

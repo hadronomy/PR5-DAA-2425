@@ -3,17 +3,21 @@
 #include <concepts>
 #include <memory>
 #include <string>
+
 #include "meta_heuristic_components.h"
 
 namespace daa {
+namespace meta {
 
-// Concept for algorithm interfaces - more concise with using the refined concept
+// Rename the concept to avoid conflict with Algorithm in algorithm_registry.h
 template <typename A, typename S, typename P>
-concept Algorithm = requires(A a, const P& p) {
+concept MetaAlgorithm = requires(A a, const P& p) {
   { a.solve(p) } -> std::convertible_to<S>;
   { a.name() } -> std::convertible_to<std::string>;
   { a.description() } -> std::convertible_to<std::string>;
 };
+
+}  // namespace meta
 
 /**
  * @brief Base class for meta-heuristic algorithms
@@ -23,10 +27,10 @@ concept Algorithm = requires(A a, const P& p) {
  * @tparam A Algorithm base class
  */
 template <typename S, typename P, typename A>
-requires meta::Solution<S, P>&& Algorithm<A, S, P> class MetaHeuristic : public A {
+requires ::meta::Solution<S, P>&& meta::MetaAlgorithm<A, S, P> class MetaHeuristic : public A {
  protected:
-  std::unique_ptr<meta::SolutionGenerator<S, P>> generator_;
-  std::unique_ptr<meta::LocalSearch<S, P>> localSearch_;
+  std::unique_ptr<::meta::SolutionGenerator<S, P>> generator_;
+  std::unique_ptr<::meta::LocalSearch<S, P>> localSearch_;
 
  public:
   /**
@@ -36,8 +40,8 @@ requires meta::Solution<S, P>&& Algorithm<A, S, P> class MetaHeuristic : public 
    * @param localSearch Strategy for improving solutions
    */
   MetaHeuristic(
-    std::unique_ptr<meta::SolutionGenerator<S, P>> generator,
-    std::unique_ptr<meta::LocalSearch<S, P>> localSearch
+    std::unique_ptr<::meta::SolutionGenerator<S, P>> generator,
+    std::unique_ptr<::meta::LocalSearch<S, P>> localSearch
   )
       : generator_(std::move(generator)), localSearch_(std::move(localSearch)) {}
 

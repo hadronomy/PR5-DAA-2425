@@ -1,5 +1,6 @@
 #include <cstdint>
 
+#include "visualization/canvas.h"
 #include "visualization/imgui_theme.h"
 #include "visualization/object_manager.h"
 
@@ -19,20 +20,17 @@ void ObjectManager::Initialize() {
 
 void ObjectManager::SetupDefaultObjects() {
   objects_.clear();
-
-  // Add some default objects
-  AddObject({300, 200}, 40, RED, "Red Circle");
-  AddObject({400, 300}, 50, BLUE, "Blue Circle");
-  AddObject({500, 250}, 30, GREEN, "Green Circle");
 }
 
-void ObjectManager::AddObject(
+GraphicalObject& ObjectManager::AddObject(
   const Vector2& position,
   float size,
   Color color,
-  const std::string& name
+  const std::string& name,
+  ObjectShape shape
 ) {
-  objects_.emplace_back(position, size, color, name);
+  objects_.emplace_back(position, size, color, name, shape);
+  return objects_.back();
 }
 
 void ObjectManager::RemoveObject(size_t index) {
@@ -41,26 +39,109 @@ void ObjectManager::RemoveObject(size_t index) {
   }
 }
 
+void ObjectManager::ClearObjects() {
+  objects_.clear();
+}
+
 void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float scale) {
-  for (auto& obj : objects_) {
-    Vector2 pos = obj.position;
-    float sz = obj.size;
+  // First, collect all transformed positions for overlap detection
+  std::vector<Vector2> transformed_positions(objects_.size());
+  std::vector<float> transformed_sizes(objects_.size());
+
+  for (size_t i = 0; i < objects_.size(); i++) {
+    Vector2 pos = objects_[i].position;
+    float sz = objects_[i].size * CANVAS_UNIT_TO_METERS;
 
     if (use_transformation) {
-      pos.x = obj.position.x * scale + offset.x;
-      pos.y = obj.position.y * scale + offset.y;
+      pos.x = pos.x * scale + offset.x;
+      pos.y = pos.y * scale + offset.y;
       sz *= scale;
     }
 
-    // Draw object at position (the transformation is handled by the camera in Canvas)
-    DrawCircleV(pos, sz, obj.color);
+    transformed_positions[i] = pos;
+    transformed_sizes[i] = sz;
+  }
 
-    // Draw a small outline to make the object more visible
+  // Find overlapping objects
+  std::vector<bool> has_overlap(objects_.size(), false);
+  for (size_t i = 0; i < objects_.size(); i++) {
+    for (size_t j = i + 1; j < objects_.size(); j++) {
+      float distance = Vector2Distance(transformed_positions[i], transformed_positions[j]);
+      float overlap_threshold = std::min(transformed_sizes[i], transformed_sizes[j]);
+
+      if (distance < overlap_threshold) {
+        has_overlap[i] = has_overlap[j] = true;
+      }
+    }
+  }
+
+  // Draw all objects
+  for (size_t i = 0; i < objects_.size(); i++) {
+    auto& obj = objects_[i];
+    Vector2 pos = transformed_positions[i];
+    float sz = transformed_sizes[i];
+
+    // Draw the object shape
+    DrawShape(pos, sz, obj.shape, obj.color);
+
+    // Draw outline
     DrawCircleLines(pos.x, pos.y, sz, ColorAlpha(WHITE, 0.3f));
 
-    // Optionally draw the object name for better visibility
-    if (sz > 20.0f) {
-      DrawText(obj.name.c_str(), pos.x - sz / 2, pos.y - 5, 10, WHITE);
+    // For overlapping objects, draw a warning indicator
+    if (has_overlap[i]) {
+      // Create a pulsing effect
+      float pulse = (sinf(GetTime() * 4.0f) + 1.0f) * 0.5f;
+      Color overlap_color = ColorAlpha(RED, 0.2f + pulse * 0.3f);
+
+      // Draw concentric warning circles
+      DrawCircleLines(pos.x, pos.y, sz * 1.2f, overlap_color);
+      DrawCircleLines(pos.x, pos.y, sz * 1.4f, overlap_color);
+
+      // Draw warning text above the object
+      const char* warning_text = "Overlapping!";
+      float text_width = MeasureText(warning_text, 10);
+      DrawText(warning_text, pos.x - text_width / 2, pos.y - sz - 15, 10, RED);
+    }
+
+    // Draw the object name if size is large enough
+    if (sz > 15.0f) {
+      DrawText(obj.name.c_str(), pos.x - sz / 2, pos.y - sz - 10, 10, WHITE);
+    }
+  }
+}
+
+void ObjectManager::DrawShape(const Vector2& position, float size, ObjectShape shape, Color color) {
+  switch (shape) {
+    case ObjectShape::CIRCLE:
+      DrawCircleV(position, size, color);
+      break;
+
+    case ObjectShape::SQUARE: {
+      Rectangle rect = {position.x - size, position.y - size, size * 2.0f, size * 2.0f};
+      DrawRectangleRec(rect, color);
+      break;
+    }
+
+    case ObjectShape::TRIANGLE: {
+      // Equilateral triangle pointing upward
+      Vector2 p1 = {position.x, position.y - size};
+      Vector2 p2 = {position.x - size * 0.866f, position.y + size * 0.5f};  // cos(60°), sin(60°)
+      Vector2 p3 = {position.x + size * 0.866f, position.y + size * 0.5f};
+
+      DrawTriangle(p1, p2, p3, color);
+      break;
+    }
+
+    case ObjectShape::PENTAGON: {
+      const int sides = 5;
+      DrawPoly(position, sides, size, 0.0f, color);
+      break;
+    }
+
+    case ObjectShape::HEXAGON: {
+      const int sides = 6;
+      DrawPoly(position, sides, size, 0.0f, color);
+      break;
     }
   }
 }
@@ -73,75 +154,51 @@ void ObjectManager::HandleObjectInteraction(
   for (auto& obj : objects_) {
     // Check if mouse is hovering over object
     float dist = Vector2Distance(world_mouse_pos, obj.position);
-    bool is_hovered = dist <= obj.size;
-
-    // Start dragging
-    if (mouse_down && is_hovered) {
-      obj.dragging = true;
-    }
-
-    // Stop dragging
-    if (mouse_released) {
-      obj.dragging = false;
-    }
-
-    // Update position if dragging
-    if (obj.dragging) {
-      obj.position = world_mouse_pos;
-    }
+    // Apply the CANVAS_UNIT_TO_METERS scaling to the object size for hover detection
+    bool is_hovered = dist <= obj.size * CANVAS_UNIT_TO_METERS;
 
     // Display tooltip when hovering
     if (is_hovered) {
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 12));
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 8));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 2));
       ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.8f, 0.8f, 0.8f, 0.3f));
+      
+      // Set minimum tooltip width to ensure columns display properly
+      ImGui::SetNextWindowSizeConstraints(ImVec2(280, 0), ImVec2(FLT_MAX, FLT_MAX));
       ImGui::BeginTooltip();
 
       // Tooltip title with background
       ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.2f, 0.2f, 0.2f, 0.8f));
       ImGui::PushFont(ImGuiThemeManager::GetInstance().GetFont("Geist Mono"));
-      ImGui::Separator();
       ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.4f, 1.0f), "%s", obj.name.c_str());
       ImGui::PopFont();
-      ImGui::Separator();
-      ImGui::PopStyleColor();
-
-      ImGui::Spacing();
+      ImGui::PopStyleColor(1); // Pop header style
 
       // Object properties
       ImGui::Columns(2, "ObjectProperties", false);
-      ImGui::SetColumnWidth(0, 100);
+      ImGui::SetColumnWidth(0, 80);
 
       ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "Position:");
       ImGui::NextColumn();
-      ImGui::Text("X: %.1f, Y: %.1f", obj.position.x, obj.position.y);
+      ImGui::Text("%.1f, %.1f", obj.position.x, obj.position.y);
       ImGui::NextColumn();
 
-      ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "Size:");
-      ImGui::NextColumn();
-      ImGui::Text("%.1f px", obj.size);
-      ImGui::NextColumn();
-
-      ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "Color:");
-      ImGui::NextColumn();
-
-      // Color preview box
-      ImVec4 objColor = ImVec4(
-        obj.color.r / 255.0f, obj.color.g / 255.0f, obj.color.b / 255.0f, obj.color.a / 255.0f
-      );
-      ImGui::ColorButton("##ColorPreview", objColor, ImGuiColorEditFlags_NoTooltip, ImVec2(20, 10));
-      ImGui::SameLine(0, 5);
-      ImGui::Text("R:%d G:%d B:%d", obj.color.r, obj.color.g, obj.color.b);
+      // Display type-specific data (limit to most important properties)
+      const auto& data = obj.GetAllData();
+      int property_count = 0;
+      for (const auto& item : data) {
+        if (property_count >= 3) break; // Limit number of properties to reduce vertical size
+        
+        ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "%s:", item.first.c_str());
+        ImGui::NextColumn();
+        ImGui::Text("%s", item.second.c_str());
+        ImGui::NextColumn();
+        property_count++;
+      }
 
       ImGui::Columns(1);
-      ImGui::Spacing();
-
-      // Bottom info
-      ImGui::Separator();
-      ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Click and drag to move");
-
       ImGui::EndTooltip();
-      ImGui::PopStyleColor();
+      ImGui::PopStyleColor(1); // Pop border style
       ImGui::PopStyleVar(2);
     }
   }
@@ -163,7 +220,8 @@ void ObjectManager::RenderControlWindow(bool* p_open) {
       255
     };
     std::string name = "Object " + std::to_string(objects_.size() + 1);
-    AddObject(pos, size, color, name);
+    ObjectShape shape = static_cast<ObjectShape>(GetRandomValue(0, 4));  // Random shape
+    AddObject(pos, size, color, name, shape);
   }
 
   ImGui::Separator();
@@ -196,6 +254,13 @@ void ObjectManager::RenderControlWindow(bool* p_open) {
           (unsigned char)(color[2] * 255),
           (unsigned char)(color[3] * 255)
         };
+      }
+
+      // Shape editor
+      const char* shapes[] = {"Circle", "Square", "Triangle", "Pentagon", "Hexagon"};
+      int current_shape = static_cast<int>(obj.shape);
+      if (ImGui::Combo("Shape", &current_shape, shapes, IM_ARRAYSIZE(shapes))) {
+        obj.shape = static_cast<ObjectShape>(current_shape);
       }
 
       // Delete button

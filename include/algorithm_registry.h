@@ -210,6 +210,27 @@ class AlgorithmRegistry {
     std::cout << table << std::endl;
   }
 
+  // Get algorithms of specific types
+  static std::vector<std::string> getAvailableGenerators() {
+    std::vector<std::string> generators;
+    for (const auto& [name, _] : instance().algorithms_) {
+      if (name.find("Generator") != std::string::npos) {
+        generators.push_back(name);
+      }
+    }
+    return generators;
+  }
+
+  static std::vector<std::string> getAvailableSearches() {
+    std::vector<std::string> searches;
+    for (const auto& [name, _] : instance().algorithms_) {
+      if (name.find("Search") != std::string::npos) {
+        searches.push_back(name);
+      }
+    }
+    return searches;
+  }
+
  private:
   // Private constructor for singleton
   AlgorithmRegistry() = default;

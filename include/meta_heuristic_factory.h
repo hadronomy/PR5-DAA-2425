@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
 #include "meta_heuristic.h"
 
 namespace daa {
@@ -17,10 +18,10 @@ namespace daa {
  * @tparam A Algorithm base class
  */
 template <typename S, typename P, typename A>
-requires meta::Solution<S, P>&& Algorithm<A, S, P> class MetaHeuristicFactory {
+requires ::meta::Solution<S, P>&& daa::meta::MetaAlgorithm<A, S, P> class MetaHeuristicFactory {
  private:
-  using Generator = meta::SolutionGenerator<S, P>;
-  using Search = meta::LocalSearch<S, P>;
+  using Generator = ::meta::SolutionGenerator<S, P>;
+  using Search = ::meta::LocalSearch<S, P>;
 
   using GeneratorCreator = std::function<std::unique_ptr<Generator>()>;
   using SearchCreator = std::function<std::unique_ptr<Search>()>;

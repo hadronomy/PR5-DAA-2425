@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "raylib.h"
 #include "visualization/canvas.h"
 #include "visualization/object_manager.h"
 #include "visualization/ui_components.h"
@@ -16,26 +15,22 @@ class VisApplication {
   VisApplication();
   ~VisApplication();
 
-  bool Initialize(int width = 1280, int height = 720, const char* title = "Visualization Window");
+  // Initialize the application with window dimensions and title
+  bool Initialize(int width, int height, const char* title);
+
+  // Check if the application should close
+  bool ShouldClose() const;
   void Run();
   void Shutdown();
 
+  void Update();
+
  private:
-  // Core components
-  std::unique_ptr<WindowSystem> window_system_;
   std::unique_ptr<ObjectManager> object_manager_;
-  std::unique_ptr<Canvas> canvas_;
+  std::unique_ptr<ProblemManager> problem_manager_;
   std::unique_ptr<UIComponents> ui_components_;
-
-  // Application state
-  int screen_width_;
-  int screen_height_;
-  Color clear_color_;
-  bool running_;
-
-  // ImGui setup
-  void SetupImGui();
-  void RenderFrame();
+  std::unique_ptr<Canvas> canvas_;
+  std::unique_ptr<WindowSystem> window_system_;
 };
 
 }  // namespace visualization

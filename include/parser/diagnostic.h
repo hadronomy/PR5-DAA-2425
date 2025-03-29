@@ -13,18 +13,6 @@
 
 #include "location.hh"
 
-// ANSI color codes
-enum class AnsiColor {
-  RESET = 0,
-  RED = 31,
-  GREEN = 32,
-  YELLOW = 33,
-  BLUE = 34,
-  MAGENTA = 35,
-  CYAN = 36,
-  WHITE = 37
-};
-
 struct CodeSnippet {
   std::vector<std::string> lines;
   int error_line_index;
@@ -93,34 +81,24 @@ class DiagnosticEngine {
   SourceManager& sources;
   bool use_colors = true;
 
-  fmt::text_style get_style(AnsiColor c) const {
-    if (!use_colors)
-      return {};
+  fmt::text_style get_error_style() const {
+    return use_colors ? fmt::fg(fmt::terminal_color::red) : fmt::text_style{};
+  }
 
-    switch (c) {
-      case AnsiColor::RED:
-        return fmt::fg(fmt::terminal_color::red);
-      case AnsiColor::GREEN:
-        return fmt::fg(fmt::terminal_color::green);
-      case AnsiColor::YELLOW:
-        return fmt::fg(fmt::terminal_color::yellow);
-      case AnsiColor::BLUE:
-        return fmt::fg(fmt::terminal_color::blue);
-      case AnsiColor::MAGENTA:
-        return fmt::fg(fmt::terminal_color::magenta);
-      case AnsiColor::CYAN:
-        return fmt::fg(fmt::terminal_color::cyan);
-      case AnsiColor::WHITE:
-        return fmt::fg(fmt::terminal_color::white);
-      default:
-        return {};
-    }
+  fmt::text_style get_warning_style() const {
+    return use_colors ? fmt::fg(fmt::terminal_color::yellow) : fmt::text_style{};
+  }
+
+  fmt::text_style get_note_style() const {
+    return use_colors ? fmt::fg(fmt::terminal_color::blue) : fmt::text_style{};
+  }
+
+  fmt::text_style get_help_style() const {
+    return use_colors ? fmt::fg(fmt::terminal_color::green) : fmt::text_style{};
   }
 
   fmt::text_style get_muted_style() const {
-    if (!use_colors)
-      return {};
-    return fmt::fg(fmt::terminal_color::bright_black);
+    return use_colors ? fmt::fg(fmt::terminal_color::bright_black) : fmt::text_style{};
   }
 
   int calculate_line_num_width(const CodeSnippet& snippet, const yy::location& loc) const {
@@ -135,7 +113,7 @@ class DiagnosticEngine {
 
     // Calculate width needed for line numbers
     int line_num_width = calculate_line_num_width(snippet, loc);
-    auto blue_style = get_style(AnsiColor::BLUE);
+    auto line_num_style = get_note_style();
 
     // Print line numbers and code
     for (size_t i = 0; i < snippet.lines.size(); i++) {
@@ -149,9 +127,9 @@ class DiagnosticEngine {
       fmt::print(
         stderr,
         "{}{} {} {}\n",
-        fmt::styled(fmt::format("{:>{}}", line_num, line_num_width), blue_style),
-        fmt::styled("", blue_style),
-        fmt::styled("│", blue_style),
+        fmt::styled(fmt::format("{:>{}}", line_num, line_num_width), line_num_style),
+        fmt::styled("", line_num_style),
+        fmt::styled("│", line_num_style),
         fmt::styled(snippet.lines[i], code_style)
       );
 
@@ -161,8 +139,8 @@ class DiagnosticEngine {
         fmt::print(
           stderr,
           "{}{} ",
-          fmt::styled(fmt::format("{:{}}", "", line_num_width + 1), blue_style),
-          fmt::styled("│", blue_style)
+          fmt::styled(fmt::format("{:{}}", "", line_num_width + 1), line_num_style),
+          fmt::styled("│", line_num_style)
         );
 
         // Indent to the error position
@@ -173,16 +151,16 @@ class DiagnosticEngine {
         fmt::print(
           stderr,
           "{}{}\n",
-          fmt::styled(carets, get_style(AnsiColor::RED)),
-          fmt::styled("→ here", get_style(AnsiColor::YELLOW))
+          fmt::styled(carets, get_error_style()),
+          fmt::styled("→ here", get_warning_style())
         );
 
         // Add an empty line after error indication
         fmt::print(
           stderr,
           "{}{}\n",
-          fmt::styled(fmt::format("{:{}}", "", line_num_width + 1), blue_style),
-          fmt::styled("│", blue_style)
+          fmt::styled(fmt::format("{:{}}", "", line_num_width + 1), line_num_style),
+          fmt::styled("│", line_num_style)
         );
       }
     }
@@ -217,13 +195,11 @@ class DiagnosticEngine {
   void print_diagnostic(const Diagnostic& diag) const {
     // Print diagnostic label based on level
     if (diag.level == DiagnosticLevel::Error) {
-      fmt::print(stderr, "{}: {}\n", fmt::styled("error", get_style(AnsiColor::RED)), diag.message);
+      fmt::print(stderr, "{}: {}\n", fmt::styled("error", get_error_style()), diag.message);
     } else if (diag.level == DiagnosticLevel::Warning) {
-      fmt::print(
-        stderr, "{}: {}\n", fmt::styled("warning", get_style(AnsiColor::YELLOW)), diag.message
-      );
+      fmt::print(stderr, "{}: {}\n", fmt::styled("warning", get_warning_style()), diag.message);
     } else {
-      fmt::print(stderr, "{}: {}\n", fmt::styled("note", get_style(AnsiColor::BLUE)), diag.message);
+      fmt::print(stderr, "{}: {}\n", fmt::styled("note", get_note_style()), diag.message);
     }
 
     // Print file:line:col information
@@ -231,7 +207,7 @@ class DiagnosticEngine {
       fmt::print(
         stderr,
         "{} {}:{}:{}\n",
-        fmt::styled(" --> ", get_style(AnsiColor::BLUE)),
+        fmt::styled(" --> ", get_note_style()),
         *diag.location.begin.filename,
         diag.location.begin.line,
         diag.location.begin.column
@@ -244,7 +220,7 @@ class DiagnosticEngine {
 
     // Print help messages
     for (const auto& help : diag.helps) {
-      fmt::print(stderr, "{}: {}\n", fmt::styled("help", get_style(AnsiColor::GREEN)), help);
+      fmt::print(stderr, "{}: {}\n", fmt::styled("help", get_help_style()), help);
     }
 
     fmt::print(stderr, "\n");

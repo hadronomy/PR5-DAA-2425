@@ -52,6 +52,8 @@ typedef struct tagMSG* LPMSG;
 #include <windows.h>
 
 // Type required by some unused function...
+#ifndef TAG_BITMAPINFOHEADER
+#define TAG_BITMAPINFOHEADER
 typedef struct tagBITMAPINFOHEADER {
   DWORD biSize;
   LONG biWidth;
@@ -65,6 +67,7 @@ typedef struct tagBITMAPINFOHEADER {
   DWORD biClrUsed;
   DWORD biClrImportant;
 } BITMAPINFOHEADER, *PBITMAPINFOHEADER;
+#endif
 
 #include <mmreg.h>
 #include <mmsystem.h>
@@ -89,7 +92,7 @@ bool VisualizeCommand::execute() {
   try {
     visualization::VisApplication gui;
 
-    if (!gui.Initialize()) {
+    if (!gui.Initialize(1024, 768, "DAA Visualizer")) {
       if (verbose_) {
         UI::error("Failed to initialize visualization GUI");
       }

@@ -110,10 +110,10 @@ class VRPTProblem {
           depot_id_ = "depot";
           auto depot = Location::Builder()
                          .setId(depot_id_)
-                         .setCoordinates(loc.x, loc.y)
+                         .setCoordinates(loc.x * 1000.0, loc.y * 1000.0)  // Convert km to m
                          .setType(LocationType::DEPOT)
                          .setName("Depot")
-                         .setServiceTime(Duration{0.0})
+                         .setServiceTime(Duration{0.0, units::TimeUnit::Minutes})
                          .setWasteAmount(Capacity{0.0})
                          .build();
 
@@ -122,10 +122,10 @@ class VRPTProblem {
           landfill_id_ = "landfill";
           auto landfill = Location::Builder()
                             .setId(landfill_id_)
-                            .setCoordinates(loc.x, loc.y)
+                            .setCoordinates(loc.x * 1000.0, loc.y * 1000.0)  // Convert km to m
                             .setType(LocationType::LANDFILL)
                             .setName("Landfill")
-                            .setServiceTime(Duration{0.0})
+                            .setServiceTime(Duration{0.0, units::TimeUnit::Minutes})
                             .setWasteAmount(Capacity{0.0})
                             .build();
 
@@ -134,10 +134,10 @@ class VRPTProblem {
           std::string swts_id = "swts_" + loc.type;
           auto swts = Location::Builder()
                         .setId(swts_id)
-                        .setCoordinates(loc.x, loc.y)
+                        .setCoordinates(loc.x * 1000.0, loc.y * 1000.0)  // Convert km to m
                         .setType(LocationType::SWTS)
                         .setName("SWTS " + loc.type)
-                        .setServiceTime(Duration{0.0})
+                        .setServiceTime(Duration{0.0, units::TimeUnit::Minutes})
                         .setWasteAmount(Capacity{0.0})
                         .build();
 
@@ -151,10 +151,10 @@ class VRPTProblem {
         std::string id = "zone_" + std::to_string(zone.id);
         auto zone_loc = Location::Builder()
                           .setId(id)
-                          .setCoordinates(zone.x, zone.y)
+                          .setCoordinates(zone.x * 1000.0, zone.y * 1000.0)  // Convert km to m
                           .setType(LocationType::COLLECTION_ZONE)
                           .setName("Zone " + std::to_string(zone.id))
-                          .setServiceTime(Duration{zone.service_time, units::TimeUnit::Seconds})
+                          .setServiceTime(Duration{zone.service_time, units::TimeUnit::Minutes})
                           .setWasteAmount(Capacity{zone.waste_amount})
                           .build();
 
@@ -337,7 +337,7 @@ class VRPTProblem {
     // Depot
     try {
       const auto& depot = getDepot();
-      oss << "Depot " << depot.x() << " " << depot.y() << '\n';
+      oss << "Depot " << (depot.x() / 1000.0) << " " << (depot.y() / 1000.0) << '\n';
     } catch (const std::exception&) {
       // Skip if not found
     }
@@ -347,16 +347,15 @@ class VRPTProblem {
       auto it = locations.find(id);
       if (it != locations.end()) {
         const auto& swts = it->second;
-        // Extract IF designation from the name, assuming format like "SWTS IF" or "SWTS IF1"
-        std::string if_name = swts.name().substr(5);  // Remove "SWTS " prefix
-        oss << if_name << " " << swts.x() << " " << swts.y() << '\n';
+        std::string if_name = swts.name().substr(5);
+        oss << if_name << " " << (swts.x() / 1000.0) << " " << (swts.y() / 1000.0) << '\n';
       }
     }
 
     // Landfill
     try {
       const auto& landfill = getLandfill();
-      oss << "Dumpsite " << landfill.x() << " " << landfill.y() << '\n';
+      oss << "Dumpsite " << (landfill.x() / 1000.0) << " " << (landfill.y() / 1000.0) << '\n';
     } catch (const std::exception&) {
       // Skip if not found
     }

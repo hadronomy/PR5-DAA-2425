@@ -6,6 +6,10 @@
 namespace daa {
 namespace visualization {
 
+// Define a constant for the scale: canvas units to meters conversion
+// 1000 units = 1000 meters => 1 unit = 1 meters
+constexpr float CANVAS_UNIT_TO_METERS = 10.0f;
+
 class Canvas {
  public:
   Canvas(int width, int height, ObjectManager* object_manager);
@@ -22,6 +26,9 @@ class Canvas {
 
   // Method to get current zoom level
   float GetScale() const { return camera_.zoom; }
+
+  // Method to fit view to a rectangle in world coordinates
+  void FitViewToBounds(const Rectangle& bounds, float padding = 0.1f);
 
   // Debug methods for the shader
   void ToggleShaderDebug() { shader_debug_mode_ = !shader_debug_mode_; }
@@ -70,6 +77,9 @@ class Canvas {
   void HandleZooming(const Vector2& mouse_pos);
   void HandlePanning(const Vector2& mouse_pos);
   void DrawScaleLegend();  // New method for drawing the scale legend
+
+  Vector2 CanvasToMeters(const Vector2& canvas_pos) const;
+  Vector2 MetersToCanvas(const Vector2& meters_pos) const;
 
   // Helper method for setting matrix uniforms
   void SetShaderValueMatrix3x3(Shader shader, int locIndex, float* mat);
