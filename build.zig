@@ -55,8 +55,8 @@ pub fn build(b: *std.Build) !void {
     // Initialize parser resources
     const parser_resources = try buildpkg.ParserResources.init(
         b,
-        "include/parser/tsp_lexer.l",
-        "include/parser/tsp_parser.y",
+        "include/parser/vrpt_lexer.l",
+        "include/parser/vrpt_parser.y",
         &config.cfiles_exts,
         &config.header_exts,
         exe,

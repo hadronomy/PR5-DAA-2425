@@ -25,6 +25,9 @@ class Duration {
   int64_t nanoseconds_;  // Store internally in nanoseconds
 
  public:
+  // Default constructor creates duration of zero
+  constexpr Duration() noexcept : nanoseconds_(0) {}
+
   explicit constexpr Duration(double value, units::TimeUnit unit = units::TimeUnit::Nanoseconds)
       : nanoseconds_(convertToNanoseconds(value, unit)) {
     if (nanoseconds_ < 0)

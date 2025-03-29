@@ -21,6 +21,16 @@ class Location {
   Capacity waste_amount_;
 
  public:
+  // Default constructor creates an empty location
+  Location() noexcept
+      : id_(""),
+        x_(0.0),
+        y_(0.0),
+        type_(LocationType::DEPOT),
+        name_(""),
+        service_time_(0.0),
+        waste_amount_(0.0) {}
+
   Location(
     std::string id,
     double x,

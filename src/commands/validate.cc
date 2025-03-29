@@ -3,20 +3,20 @@
 #include <fmt/format.h>
 #include <CLI/CLI.hpp>
 
-#include "parser/tsp_driver.h"
+#include "parser/vrpt_driver.h"
+#include "problem/vrpt_problem.h"
 #include "ui.h"
 
 namespace daa {
 
 bool ValidateCommand::execute() {
   try {
-    TSPDriver driver;
-    bool success = driver.parse_file(path_);
+    const auto& problem = VRPTProblem::loadFile(path_);
+    bool success = problem.has_value();
     if (!success) {
       UI::error(fmt::format("Failed to parse file: {}", path_));
       return false;
     }
-    std::cout << driver.graph.serializeSimpleFormat() << std::endl;
     return true;
   } catch (const std::exception& e) {
     UI::error(fmt::format("Validation failed: {}", e.what()));

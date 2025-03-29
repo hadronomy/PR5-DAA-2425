@@ -158,9 +158,9 @@ fn makeBisonStep(
     const bison_cmd = b.addSystemCommand(&[_][]const u8{
         "bison",
         "--language=c++",
-        "--defines=tsp_parser.h",
+        "--defines=vrpt_parser.h",
     });
-    bison_cmd.addPrefixedFileArg("--defines=", b.path(binary_dir).path(b, "tsp_parser.h"));
+    bison_cmd.addPrefixedFileArg("--defines=", b.path(binary_dir).path(b, "vrpt_parser.h"));
     bison_cmd.addFileArg(b.path(input_file));
     bison_cmd.setCwd(.{ .cwd_relative = binary_dir });
     bison_cmd.has_side_effects = true;
