@@ -1,6 +1,5 @@
 #include "visualization/application.h"
 
-#include "imgui.h"
 #include "rlImGui.h"
 
 namespace daa {
