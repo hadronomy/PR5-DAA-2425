@@ -151,56 +151,127 @@ void ObjectManager::HandleObjectInteraction(
   bool mouse_down,
   bool mouse_released
 ) {
+  // Calculate hover state for each object
   for (auto& obj : objects_) {
-    // Check if mouse is hovering over object
-    float dist = Vector2Distance(world_mouse_pos, obj.position);
-    // Apply the CANVAS_UNIT_TO_METERS scaling to the object size for hover detection
-    bool is_hovered = dist <= obj.size * CANVAS_UNIT_TO_METERS;
+    // Check if mouse is hovering over the object
+    const float distance = Vector2Distance(world_mouse_pos, obj.position);
+    const float hover_radius = obj.size * CANVAS_UNIT_TO_METERS;
+    const bool is_hovered = distance <= hover_radius;
 
-    // Display tooltip when hovering
-    if (is_hovered) {
-      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
-      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 2));
-      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.8f, 0.8f, 0.8f, 0.3f));
-      
-      // Set minimum tooltip width to ensure columns display properly
-      ImGui::SetNextWindowSizeConstraints(ImVec2(280, 0), ImVec2(FLT_MAX, FLT_MAX));
-      ImGui::BeginTooltip();
+    // Only show tooltip when object is hovered
+    if (!is_hovered)
+      continue;
 
-      // Tooltip title with background
-      ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.2f, 0.2f, 0.2f, 0.8f));
-      ImGui::PushFont(ImGuiThemeManager::GetInstance().GetFont("Geist Mono"));
-      ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.4f, 1.0f), "%s", obj.name.c_str());
-      ImGui::PopFont();
-      ImGui::PopStyleColor(1); // Pop header style
+    // ╭──────────────────────────────────────────╮
+    // │ Enhanced Tooltip Configuration           │
+    // ╰──────────────────────────────────────────╯
 
-      // Object properties
-      ImGui::Columns(2, "ObjectProperties", false);
-      ImGui::SetColumnWidth(0, 80);
+    // Create a more attractive tooltip style
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 12));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 6));
+    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.11f, 0.12f, 0.14f, 0.94f));
+    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.8f, 0.8f, 0.8f, 0.25f));
 
-      ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "Position:");
+    // Set tooltip width constraints
+    ImGui::SetNextWindowSizeConstraints(ImVec2(320, 0), ImVec2(FLT_MAX, FLT_MAX));
+    ImGui::BeginTooltip();
+
+    // ╭──────────────────────────────────────────╮
+    // │ Enhanced Title with Decoration           │
+    // ╰──────────────────────────────────────────╯
+    ImGui::PushFont(ImGuiThemeManager::GetInstance().GetFont("Geist Mono"));
+
+    // Title background with gradient effect
+    const float title_padding = 8.0f;
+    ImVec2 title_min = ImGui::GetCursorScreenPos();
+    ImVec2 title_max = {
+      title_min.x + ImGui::GetContentRegionAvail().x,
+      title_min.y + ImGui::GetFontSize() + title_padding * 2
+    };
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddRectFilled(title_min, title_max, ImColor(0.18f, 0.2f, 0.25f, 0.9f), 5.0f);
+
+    // Add gradient overlay to title
+    draw_list->AddRectFilledMultiColor(
+      title_min,
+      title_max,
+      ImColor(0.4f, 0.5f, 0.7f, 0.3f),
+      ImColor(0.2f, 0.3f, 0.5f, 0.1f),
+      ImColor(0.2f, 0.3f, 0.5f, 0.1f),
+      ImColor(0.4f, 0.5f, 0.7f, 0.3f)
+    );
+
+    // Title text with sparkle
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + title_padding);
+    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4.0f);
+    ImGui::TextColored(ImVec4(1.0f, 0.95f, 0.7f, 1.0f), "* %s", obj.name.c_str());
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + title_padding - 2.0f);
+    ImGui::PopFont();
+
+    // Fancy separator
+    ImGui::Dummy(ImVec2(0, 4));
+    const ImVec2 sep_pos = ImGui::GetCursorScreenPos();
+    const float sep_width = ImGui::GetContentRegionAvail().x;
+    draw_list->AddRectFilled(
+      ImVec2(sep_pos.x, sep_pos.y),
+      ImVec2(sep_pos.x + sep_width, sep_pos.y + 1),
+      ImColor(0.6f, 0.7f, 1.0f, 0.4f)
+    );
+    draw_list->AddRectFilled(
+      ImVec2(sep_pos.x, sep_pos.y + 1),
+      ImVec2(sep_pos.x + sep_width, sep_pos.y + 2),
+      ImColor(0.3f, 0.4f, 0.7f, 0.2f)
+    );
+    ImGui::Dummy(ImVec2(0, 6));
+
+    // ╭──────────────────────────────────────────╮
+    // │ Enhanced Properties Display              │
+    // ╰──────────────────────────────────────────╯
+    ImGui::Columns(2, "ObjectProperties", false);
+    ImGui::SetColumnWidth(0, 100);
+
+    // Property display with icons
+    ImGui::TextColored(ImVec4(0.7f, 0.85f, 1.0f, 0.85f), "[P] Position:");
+    ImGui::NextColumn();
+    ImGui::TextColored(
+      ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%.1f, %.1f", obj.position.x, obj.position.y
+    );
+    ImGui::NextColumn();
+
+    // Display important properties with icons
+    const char* property_icons[] = {"[S]", "[C]", "[T]", "[#]"};
+    const auto& data = obj.GetAllData();
+    int property_count = 0;
+
+    for (const auto& [key, value] : data) {
+      ImGui::TextColored(
+        ImVec4(0.7f, 0.85f, 1.0f, 0.85f), "%s %s:", property_icons[property_count % 4], key.c_str()
+      );
       ImGui::NextColumn();
-      ImGui::Text("%.1f, %.1f", obj.position.x, obj.position.y);
+      ImGui::TextColored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s", value.c_str());
       ImGui::NextColumn();
-
-      // Display type-specific data (limit to most important properties)
-      const auto& data = obj.GetAllData();
-      int property_count = 0;
-      for (const auto& item : data) {
-        if (property_count >= 3) break; // Limit number of properties to reduce vertical size
-        
-        ImGui::TextColored(ImVec4(0.7f, 0.9f, 1.0f, 1.0f), "%s:", item.first.c_str());
-        ImGui::NextColumn();
-        ImGui::Text("%s", item.second.c_str());
-        ImGui::NextColumn();
-        property_count++;
-      }
-
-      ImGui::Columns(1);
-      ImGui::EndTooltip();
-      ImGui::PopStyleColor(1); // Pop border style
-      ImGui::PopStyleVar(2);
+      property_count++;
     }
+
+    // Bottom decoration
+    ImGui::Columns(1);
+    ImGui::Dummy(ImVec2(0, 3));
+    const ImVec2 bottom_pos = ImGui::GetCursorScreenPos();
+    draw_list->AddRectFilledMultiColor(
+      bottom_pos,
+      ImVec2(bottom_pos.x + ImGui::GetWindowWidth() - 24, bottom_pos.y + 1),
+      ImColor(0.4f, 0.5f, 0.7f, 0.2f),
+      ImColor(0.6f, 0.7f, 0.9f, 0.4f),
+      ImColor(0.6f, 0.7f, 0.9f, 0.4f),
+      ImColor(0.4f, 0.5f, 0.7f, 0.2f)
+    );
+
+    // Cleanup
+    ImGui::EndTooltip();
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar(3);
   }
 }
 

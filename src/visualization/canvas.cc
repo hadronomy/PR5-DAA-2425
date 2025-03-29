@@ -523,18 +523,24 @@ void Canvas::FitViewToBounds(const Rectangle& bounds, float padding) {
     return;
 
   // Calculate the scale factor to fit the bounds in the view
-  float scaleX = width_ / (bounds.width * (1.0f + padding * 2.0f));
-  float scaleY = height_ / (bounds.height * (1.0f + padding * 2.0f));
+  // Add more padding to prevent excessive zoom-in
+  float effectivePadding = fmaxf(0.5f, padding);  // Increased minimum padding
+
+  float scaleX = width_ / (bounds.width * (1.0f + effectivePadding));
+  float scaleY = height_ / (bounds.height * (1.0f + effectivePadding));
 
   // Choose the smaller scale to ensure everything fits
   float newZoom = fminf(scaleX, scaleY);
 
-  // Update the camera zoom with limits
-  camera_.zoom = Clamp(newZoom, 0.00125f, 10000.0f);
+  // Apply an additional scaling factor to zoom out more
+  newZoom *= 0.7f;  // Reduce zoom by 30%
 
-  // Center the camera on the bounds
+  // Update the camera zoom with more reasonable limits
+  camera_.zoom = Clamp(newZoom, 0.05f, 10000.0f);
+
+  // Center the camera on the bounds (properly centered both horizontally and vertically)
   camera_.target.x = bounds.x + bounds.width / 2.0f;
-  camera_.target.y = bounds.y + bounds.height / 2.0f;
+  camera_.target.y = bounds.y + bounds.height / 8.0f;  // True vertical center
 
   // Make sure camera gets updated
   Update();
