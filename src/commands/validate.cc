@@ -17,6 +17,14 @@ bool ValidateCommand::execute() {
       UI::error(fmt::format("Failed to parse file: {}", path_));
       return false;
     }
+    std::cout << "File parsed successfully." << std::endl;
+    const auto& vrpt_problem = problem.value();
+    if (!vrpt_problem.isLoaded()) {
+      UI::error("Problem data is not loaded.");
+      return false;
+    }
+    std::cout << "Problem data loaded successfully." << std::endl;
+    std::cout << problem->toString() << std::endl;
     return true;
   } catch (const std::exception& e) {
     UI::error(fmt::format("Validation failed: {}", e.what()));

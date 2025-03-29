@@ -54,7 +54,12 @@ class Duration {
     }
   }
 
-  [[nodiscard]] constexpr double getValue(units::TimeUnit unit) const {
+  [[deprecated("Use value() instead.")]] [[nodiscard]]
+  constexpr double getValue(units::TimeUnit unit) const {
+    return value(unit);
+  }
+
+  [[nodiscard]] constexpr double value(units::TimeUnit unit) const {
     switch (unit) {
       case units::TimeUnit::Nanoseconds:
         return static_cast<double>(nanoseconds_);

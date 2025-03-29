@@ -3,6 +3,7 @@
 #include <cmath>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -11,6 +12,7 @@
 #include "kdtree.h"
 #include "location.h"
 #include "parser/vrpt_driver.h"
+#include "problem/units.h"
 #include "strong_types.h"
 
 namespace daa {
@@ -308,6 +310,76 @@ class VRPTProblem {
    */
   [[nodiscard]] bool isLoaded() const noexcept {
     return !depot_id_.empty() && !landfill_id_.empty() && !zone_ids_.empty();
+  }
+
+  /**
+   * @brief Convert the problem to a string representation
+   * @return String representation of the problem in the same format as the input file
+   */
+  [[nodiscard]] std::string toString() const {
+    std::ostringstream oss;
+
+    // Problem parameters
+    oss << "L1 " << cv_max_duration_.value(units::TimeUnit::Minutes) << '\n';
+    oss << "L2 " << tv_max_duration_.value(units::TimeUnit::Minutes) << '\n';
+    oss << "num_vehicles " << num_cv_vehicles_ << '\n';
+    oss << "num_zones " << num_zones_ << '\n';
+    oss << "Lx " << map_width_ << '\n';
+    oss << "Ly " << map_height_ << '\n';
+    oss << "Q1 " << cv_capacity_.value() << '\n';
+    oss << "Q2 " << tv_capacity_.value() << '\n';
+    oss << "V " << vehicle_speed_.getValue(units::DistanceUnit::Kilometers, units::TimeUnit::Hours)
+        << '\n';
+
+    // Locations
+    const auto& locations = location_tree_.getLocations();
+
+    // Depot
+    try {
+      const auto& depot = getDepot();
+      oss << "Depot " << depot.x() << " " << depot.y() << '\n';
+    } catch (const std::exception&) {
+      // Skip if not found
+    }
+
+    // SWTS locations
+    for (const auto& id : swts_ids_) {
+      auto it = locations.find(id);
+      if (it != locations.end()) {
+        const auto& swts = it->second;
+        // Extract IF designation from the name, assuming format like "SWTS IF" or "SWTS IF1"
+        std::string if_name = swts.name().substr(5);  // Remove "SWTS " prefix
+        oss << if_name << " " << swts.x() << " " << swts.y() << '\n';
+      }
+    }
+
+    // Landfill
+    try {
+      const auto& landfill = getLandfill();
+      oss << "Dumpsite " << landfill.x() << " " << landfill.y() << '\n';
+    } catch (const std::exception&) {
+      // Skip if not found
+    }
+
+    // Parameters
+    oss << "epsilon " << epsilon_ << '\n';
+    oss << "offset " << offset_ << '\n';
+    oss << "k " << k_param_ << '\n';
+
+    // Collection zones
+    for (const auto& id : zone_ids_) {
+      auto it = locations.find(id);
+      if (it != locations.end()) {
+        const auto& zone = it->second;
+        // Extract zone number from ID, assuming format like "zone_1"
+        std::string zone_number = id.substr(5);
+        oss << zone_number << " " << zone.x() << " " << zone.y() << " "
+            << zone.wasteAmount().value() << " "
+            << zone.serviceTime().value(units::TimeUnit::Seconds) << '\n';
+      }
+    }
+
+    return oss.str();
   }
 };
 
