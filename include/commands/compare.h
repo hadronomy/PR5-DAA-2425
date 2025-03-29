@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "algorithm_factory.h"
+#include "algorithm_registry.h"
 #include "command_handler.h"
 #include "command_registry.h"
 
