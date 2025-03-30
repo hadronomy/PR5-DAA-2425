@@ -12,26 +12,29 @@
 #pragma warning(disable : 4100 4101)  // Unused parameter and variable warnings
 #endif
 
-// Include core headers first
-// IWYU pragma: begin_exports
+// Solution representation must be included first to resolve forward declarations
+#include "algorithms/vrpt_solution.h"
+
+// Base algorithm components
 #include "algorithm_factory.h"
 #include "algorithm_registry.h"
-// IWYU pragma: end_exports
+#include "meta_heuristic.h"
+#include "meta_heuristic_components.h"
+#include "meta_heuristic_factory.h"
 
 // Include algorithm implementations with direct registration
-// IWYU pragma: begin_exports
-// TODO: Add all other algorithm headers here
-// IWYU pragma: end_exports
-
-namespace daa {
+#include "algorithms/cv_local_search.h"
+#include "algorithms/grasp_cv_generator.h"
+#include "algorithms/greedy_cv_generator.h"
+#include "algorithms/greedy_tv_scheduler.h"
+#include "algorithms/gvns.h"
+#include "algorithms/multi_start.h"
 
 // Initialize Factory and register global algorithms
 inline void initializeAlgorithms() {
-  // This function is called implicitly when the header is included
-  // You can add any initialization code here if needed
+  // No additional initialization required as algorithms
+  // are registered automatically through REGISTER_* macros
 }
-
-}  // namespace daa
 
 // Restore warning settings
 #ifdef __GNUC__

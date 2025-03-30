@@ -18,6 +18,71 @@ class Capacity {
       throw std::invalid_argument("Capacity cannot be negative");
   }
   [[nodiscard]] constexpr double value() const noexcept { return value_; }
+
+  // Comparison operators
+  [[nodiscard]] constexpr bool operator==(const Capacity& other) const noexcept {
+    return value_ == other.value_;
+  }
+  [[nodiscard]] constexpr bool operator!=(const Capacity& other) const noexcept {
+    return value_ != other.value_;
+  }
+  [[nodiscard]] constexpr bool operator<(const Capacity& other) const noexcept {
+    return value_ < other.value_;
+  }
+  [[nodiscard]] constexpr bool operator<=(const Capacity& other) const noexcept {
+    return value_ <= other.value_;
+  }
+  [[nodiscard]] constexpr bool operator>(const Capacity& other) const noexcept {
+    return value_ > other.value_;
+  }
+  [[nodiscard]] constexpr bool operator>=(const Capacity& other) const noexcept {
+    return value_ >= other.value_;
+  }
+
+  // Compound assignment operators
+  constexpr Capacity& operator+=(const Capacity& other) noexcept {
+    value_ += other.value_;
+    return *this;
+  }
+  constexpr Capacity& operator-=(const Capacity& other) {
+    if (value_ < other.value_)
+      throw std::invalid_argument("Capacity cannot be negative");
+    value_ -= other.value_;
+    return *this;
+  }
+  constexpr Capacity& operator*=(double scalar) {
+    if (scalar < 0.0)
+      throw std::invalid_argument("Result cannot be negative");
+    value_ *= scalar;
+    return *this;
+  }
+  constexpr Capacity& operator/=(double scalar) {
+    if (scalar <= 0.0)
+      throw std::invalid_argument("Cannot divide by zero or negative value");
+    value_ /= scalar;
+    return *this;
+  }
+
+  // Arithmetic operators
+  [[nodiscard]] friend constexpr Capacity operator+(Capacity lhs, const Capacity& rhs) noexcept {
+    lhs += rhs;
+    return lhs;
+  }
+  [[nodiscard]] friend constexpr Capacity operator-(Capacity lhs, const Capacity& rhs) {
+    lhs -= rhs;
+    return lhs;
+  }
+  [[nodiscard]] friend constexpr Capacity operator*(Capacity lhs, double scalar) {
+    lhs *= scalar;
+    return lhs;
+  }
+  [[nodiscard]] friend constexpr Capacity operator*(double scalar, const Capacity& rhs) {
+    return rhs * scalar;
+  }
+  [[nodiscard]] friend constexpr Capacity operator/(Capacity lhs, double scalar) {
+    lhs /= scalar;
+    return lhs;
+  }
 };
 
 // Forward declaration to resolve circular dependencies
@@ -59,7 +124,7 @@ class Duration {
     return value(unit);
   }
 
-  [[nodiscard]] constexpr double value(units::TimeUnit unit) const {
+  [[nodiscard]] constexpr double value(units::TimeUnit unit = units::TimeUnit::Seconds) const {
     switch (unit) {
       case units::TimeUnit::Nanoseconds:
         return static_cast<double>(nanoseconds_);
@@ -107,6 +172,82 @@ class Duration {
     return lhs;
   }
 
+  // Subtraction operators
+  Duration& operator-=(const Duration& other) {
+    if (nanoseconds_ < other.nanoseconds_)
+      throw std::invalid_argument("Duration cannot be negative");
+    nanoseconds_ -= other.nanoseconds_;
+    return *this;
+  }
+
+  template <TimeConvertible T>
+  Duration& operator-=(const T& other) {
+    if (nanoseconds_ < other.nanoseconds())
+      throw std::invalid_argument("Duration cannot be negative");
+    nanoseconds_ -= other.nanoseconds();
+    return *this;
+  }
+
+  [[nodiscard]] friend Duration operator-(Duration lhs, const Duration& rhs) {
+    lhs -= rhs;
+    return lhs;
+  }
+
+  template <TimeConvertible T>
+  [[nodiscard]] friend Duration operator-(Duration lhs, const T& rhs) {
+    lhs -= rhs;
+    return lhs;
+  }
+
+  // Scalar multiplication and division
+  Duration& operator*=(double scalar) {
+    if (scalar < 0.0)
+      throw std::invalid_argument("Result cannot be negative");
+    nanoseconds_ = static_cast<int64_t>(static_cast<double>(nanoseconds_) * scalar);
+    return *this;
+  }
+
+  Duration& operator/=(double scalar) {
+    if (scalar <= 0.0)
+      throw std::invalid_argument("Cannot divide by zero or negative value");
+    nanoseconds_ = static_cast<int64_t>(static_cast<double>(nanoseconds_) / scalar);
+    return *this;
+  }
+
+  [[nodiscard]] friend Duration operator*(Duration lhs, double scalar) {
+    lhs *= scalar;
+    return lhs;
+  }
+
+  [[nodiscard]] friend Duration operator*(double scalar, const Duration& rhs) {
+    return rhs * scalar;
+  }
+
+  [[nodiscard]] friend Duration operator/(Duration lhs, double scalar) {
+    lhs /= scalar;
+    return lhs;
+  }
+
+  // Comparison operators
+  [[nodiscard]] constexpr bool operator==(const Duration& other) const noexcept {
+    return nanoseconds_ == other.nanoseconds_;
+  }
+  [[nodiscard]] constexpr bool operator!=(const Duration& other) const noexcept {
+    return nanoseconds_ != other.nanoseconds_;
+  }
+  [[nodiscard]] constexpr bool operator<(const Duration& other) const noexcept {
+    return nanoseconds_ < other.nanoseconds_;
+  }
+  [[nodiscard]] constexpr bool operator<=(const Duration& other) const noexcept {
+    return nanoseconds_ <= other.nanoseconds_;
+  }
+  [[nodiscard]] constexpr bool operator>(const Duration& other) const noexcept {
+    return nanoseconds_ > other.nanoseconds_;
+  }
+  [[nodiscard]] constexpr bool operator>=(const Duration& other) const noexcept {
+    return nanoseconds_ >= other.nanoseconds_;
+  }
+
   // Calculate distance when multiplied by speed
   friend Distance operator*(const Duration& duration, const Speed& speed);
   friend Distance operator*(const Speed& speed, const Duration& duration);
@@ -136,7 +277,13 @@ class Distance {
     }
   }
 
-  [[nodiscard]] constexpr double getValue(units::DistanceUnit unit) const {
+  [[deprecated("Use value() instead.")]] [[nodiscard]]
+  constexpr double getValue(units::DistanceUnit unit) const {
+    return value(unit);
+  }
+
+  [[nodiscard]] constexpr double value(units::DistanceUnit unit = units::DistanceUnit::Meters)
+    const {
     switch (unit) {
       case units::DistanceUnit::Meters:
         return meters_;
@@ -154,6 +301,78 @@ class Distance {
     return meters_ * units::meters_to_kilometers;
   }
   [[nodiscard]] constexpr double miles() const noexcept { return meters_ * units::meters_to_miles; }
+
+  // Comparison operators
+  [[nodiscard]] constexpr bool operator==(const Distance& other) const noexcept {
+    return meters_ == other.meters_;
+  }
+  [[nodiscard]] constexpr bool operator!=(const Distance& other) const noexcept {
+    return meters_ != other.meters_;
+  }
+  [[nodiscard]] constexpr bool operator<(const Distance& other) const noexcept {
+    return meters_ < other.meters_;
+  }
+  [[nodiscard]] constexpr bool operator<=(const Distance& other) const noexcept {
+    return meters_ <= other.meters_;
+  }
+  [[nodiscard]] constexpr bool operator>(const Distance& other) const noexcept {
+    return meters_ > other.meters_;
+  }
+  [[nodiscard]] constexpr bool operator>=(const Distance& other) const noexcept {
+    return meters_ >= other.meters_;
+  }
+
+  // Addition and subtraction operators
+  Distance& operator+=(const Distance& other) noexcept {
+    meters_ += other.meters_;
+    return *this;
+  }
+
+  Distance& operator-=(const Distance& other) {
+    if (meters_ < other.meters_)
+      throw std::invalid_argument("Distance cannot be negative");
+    meters_ -= other.meters_;
+    return *this;
+  }
+
+  [[nodiscard]] friend Distance operator+(Distance lhs, const Distance& rhs) noexcept {
+    lhs += rhs;
+    return lhs;
+  }
+
+  [[nodiscard]] friend Distance operator-(Distance lhs, const Distance& rhs) {
+    lhs -= rhs;
+    return lhs;
+  }
+
+  // Scalar multiplication and division
+  Distance& operator*=(double scalar) {
+    if (scalar < 0.0)
+      throw std::invalid_argument("Result cannot be negative");
+    meters_ *= scalar;
+    return *this;
+  }
+
+  Distance& operator/=(double scalar) {
+    if (scalar <= 0.0)
+      throw std::invalid_argument("Cannot divide by zero or negative value");
+    meters_ /= scalar;
+    return *this;
+  }
+
+  [[nodiscard]] friend Distance operator*(Distance lhs, double scalar) {
+    lhs *= scalar;
+    return lhs;
+  }
+
+  [[nodiscard]] friend Distance operator*(double scalar, const Distance& rhs) {
+    return rhs * scalar;
+  }
+
+  [[nodiscard]] friend Distance operator/(Distance lhs, double scalar) {
+    lhs /= scalar;
+    return lhs;
+  }
 
   // Calculate speed when divided by duration
   [[nodiscard]] Speed operator/(const Duration& duration) const;
@@ -242,8 +461,15 @@ class Speed {
   }
 
   // Get value in any distance/time unit combination
-  [[nodiscard]] constexpr double getValue(units::DistanceUnit distUnit, units::TimeUnit timeUnit)
-    const {
+  [[deprecated("Use value() instead.")]] [[nodiscard]]
+  constexpr double getValue(units::DistanceUnit distUnit, units::TimeUnit timeUnit) const {
+    return value(distUnit, timeUnit);
+  }
+
+  [[nodiscard]] constexpr double value(
+    units::DistanceUnit distUnit = units::DistanceUnit::Meters,
+    units::TimeUnit timeUnit = units::TimeUnit::Seconds
+  ) const {
     // First get the distance conversion factor
     double distConversion = 1.0;
     switch (distUnit) {
@@ -283,7 +509,13 @@ class Speed {
   }
 
   // Legacy getValue method (for backward compatibility)
-  [[nodiscard]] constexpr double getValue(units::SpeedUnit unit) const {
+  [[deprecated("Use value() with SpeedUnit parameter instead.")]] [[nodiscard]]
+  constexpr double getValue(units::SpeedUnit unit) const {
+    return value(unit);
+  }
+
+  [[nodiscard]] constexpr double value(units::SpeedUnit unit = units::SpeedUnit::MetersPerSecond)
+    const {
     switch (unit) {
       case units::SpeedUnit::MetersPerSecond:
         return mps_;
@@ -302,6 +534,76 @@ class Speed {
     return mps_ * units::mps_to_kmph;
   }
   [[nodiscard]] constexpr double milesPerHour() const noexcept { return mps_ * units::mps_to_mph; }
+
+  // Comparison operators
+  [[nodiscard]] constexpr bool operator==(const Speed& other) const noexcept {
+    return mps_ == other.mps_;
+  }
+  [[nodiscard]] constexpr bool operator!=(const Speed& other) const noexcept {
+    return mps_ != other.mps_;
+  }
+  [[nodiscard]] constexpr bool operator<(const Speed& other) const noexcept {
+    return mps_ < other.mps_;
+  }
+  [[nodiscard]] constexpr bool operator<=(const Speed& other) const noexcept {
+    return mps_ <= other.mps_;
+  }
+  [[nodiscard]] constexpr bool operator>(const Speed& other) const noexcept {
+    return mps_ > other.mps_;
+  }
+  [[nodiscard]] constexpr bool operator>=(const Speed& other) const noexcept {
+    return mps_ >= other.mps_;
+  }
+
+  // Addition and subtraction operators
+  Speed& operator+=(const Speed& other) noexcept {
+    mps_ += other.mps_;
+    return *this;
+  }
+
+  Speed& operator-=(const Speed& other) {
+    if (mps_ < other.mps_)
+      throw std::invalid_argument("Speed cannot be negative");
+    mps_ -= other.mps_;
+    return *this;
+  }
+
+  [[nodiscard]] friend Speed operator+(Speed lhs, const Speed& rhs) noexcept {
+    lhs += rhs;
+    return lhs;
+  }
+
+  [[nodiscard]] friend Speed operator-(Speed lhs, const Speed& rhs) {
+    lhs -= rhs;
+    return lhs;
+  }
+
+  // Scalar multiplication and division
+  Speed& operator*=(double scalar) {
+    if (scalar < 0.0)
+      throw std::invalid_argument("Result cannot be negative");
+    mps_ *= scalar;
+    return *this;
+  }
+
+  Speed& operator/=(double scalar) {
+    if (scalar <= 0.0)
+      throw std::invalid_argument("Cannot divide by zero or negative value");
+    mps_ /= scalar;
+    return *this;
+  }
+
+  [[nodiscard]] friend Speed operator*(Speed lhs, double scalar) {
+    lhs *= scalar;
+    return lhs;
+  }
+
+  [[nodiscard]] friend Speed operator*(double scalar, const Speed& rhs) { return rhs * scalar; }
+
+  [[nodiscard]] friend Speed operator/(Speed lhs, double scalar) {
+    lhs /= scalar;
+    return lhs;
+  }
 
   // Calculate distance when multiplied by duration
   [[nodiscard]] Distance operator*(const Duration& duration) const;

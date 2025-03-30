@@ -5,6 +5,7 @@
 
 #include <CLI/CLI.hpp>
 
+#include "algorithms.h"
 #include "command_registry.h"
 
 namespace daa {

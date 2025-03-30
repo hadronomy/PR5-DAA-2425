@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -111,12 +112,22 @@ requires ::meta::Solution<S, P>&& daa::meta::MetaAlgorithm<A, S, P> class MetaHe
 };
 
 // Helper macros for registration
-#define REGISTER_META_GENERATOR(Solution, Problem, Algorithm, ClassName, name) \
-  static bool ClassName##_registered_gen =                                     \
-    MetaHeuristicFactory<Solution, Problem, Algorithm>::registerGenerator<ClassName>(name)
+// Basic versions that use class name as the registration name
+#define REGISTER_META_GENERATOR(Solution, Problem, Algorithm, ClassName) \
+  inline static bool ClassName##_registered_gen =                        \
+    MetaHeuristicFactory<Solution, Problem, Algorithm>::registerGenerator<ClassName>(#ClassName)
 
-#define REGISTER_META_SEARCH(Solution, Problem, Algorithm, ClassName, name) \
-  static bool ClassName##_registered_search =                               \
-    MetaHeuristicFactory<Solution, Problem, Algorithm>::registerSearch<ClassName>(name)
+#define REGISTER_META_SEARCH(Solution, Problem, Algorithm, ClassName) \
+  inline static bool ClassName##_registered_search =                  \
+    MetaHeuristicFactory<Solution, Problem, Algorithm>::registerSearch<ClassName>(#ClassName)
+
+// Extended versions that allow custom names
+#define REGISTER_META_GENERATOR_NAMED(Solution, Problem, Algorithm, ClassName, Name) \
+  inline static bool ClassName##_registered_gen =                                    \
+    MetaHeuristicFactory<Solution, Problem, Algorithm>::registerGenerator<ClassName>(Name)
+
+#define REGISTER_META_SEARCH_NAMED(Solution, Problem, Algorithm, ClassName, Name) \
+  inline static bool ClassName##_registered_search =                              \
+    MetaHeuristicFactory<Solution, Problem, Algorithm>::registerSearch<ClassName>(Name)
 
 }  // namespace daa

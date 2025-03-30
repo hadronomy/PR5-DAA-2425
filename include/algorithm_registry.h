@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "algorithms/vrpt_solution.h"
+#include "meta_heuristic_factory.h"
 #include "ui.h"
 
 namespace daa {
@@ -212,23 +214,17 @@ class AlgorithmRegistry {
 
   // Get algorithms of specific types
   static std::vector<std::string> getAvailableGenerators() {
-    std::vector<std::string> generators;
-    for (const auto& [name, _] : instance().algorithms_) {
-      if (name.find("Generator") != std::string::npos) {
-        generators.push_back(name);
-      }
-    }
-    return generators;
+    return MetaHeuristicFactory<
+      algorithm::VRPTSolution,
+      VRPTProblem,
+      TypedAlgorithm<VRPTProblem, algorithm::VRPTSolution>>::availableGenerators();
   }
 
   static std::vector<std::string> getAvailableSearches() {
-    std::vector<std::string> searches;
-    for (const auto& [name, _] : instance().algorithms_) {
-      if (name.find("Search") != std::string::npos) {
-        searches.push_back(name);
-      }
-    }
-    return searches;
+    return MetaHeuristicFactory<
+      algorithm::VRPTSolution,
+      VRPTProblem,
+      TypedAlgorithm<VRPTProblem, algorithm::VRPTSolution>>::availableSearches();
   }
 
  private:

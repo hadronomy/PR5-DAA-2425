@@ -9,6 +9,8 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
+#include "algorithms.h"
+
 namespace daa {
 namespace visualization {
 

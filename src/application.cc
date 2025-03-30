@@ -3,8 +3,9 @@
 #include <fmt/format.h>
 
 #include "algorithm_factory.h"
-#include "algorithms.h"  // Include this first to trigger static registration
 #include "ui.h"
+
+#include "algorithms.h"
 
 namespace daa {
 

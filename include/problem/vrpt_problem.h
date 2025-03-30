@@ -15,6 +15,13 @@
 #include "problem/units.h"
 #include "strong_types.h"
 
+// Forward declaration for SolutionType
+namespace daa {
+namespace algorithm {
+class VRPTSolution;
+}
+}  // namespace daa
+
 namespace daa {
 
 /**
@@ -23,6 +30,10 @@ namespace daa {
  * Collection
  */
 class VRPTProblem {
+ public:
+  // Required for meta::Problem concept
+  using SolutionType = algorithm::VRPTSolution;
+
  private:
   // Problem parameters
   Duration cv_max_duration_{0.0};  // L1: Max duration for collection vehicles
@@ -177,6 +188,13 @@ class VRPTProblem {
       return false;
     }
   }
+
+  /**
+   * @brief Evaluate solution quality - primary objective is to minimize the number of CV vehicles
+   * @param solution The solution to evaluate
+   * @return Solution cost (lower is better)
+   */
+  double evaluateSolution(const algorithm::VRPTSolution& solution) const;
 
   // Getters for problem parameters
   [[nodiscard]] Duration getCVMaxDuration() const noexcept { return cv_max_duration_; }
