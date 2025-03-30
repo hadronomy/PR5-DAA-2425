@@ -423,71 +423,202 @@ void UIComponents::RenderAlgorithmSelector() {
     return;
   }
 
-  std::vector<std::string> algorithms = AlgorithmRegistry::availableAlgorithms();
-  bool has_algorithms = !algorithms.empty();
+  // Get meta-algorithm options (like GVNS, MultiStart)
+  static std::vector<std::string> meta_algorithms = {"GVNS", "MultiStart", "VRPTSolver"};
 
-  // Show warning only once when we detect there are no algorithms
-  static bool already_shown_warning = false;
-  if (!has_algorithms && !already_shown_warning) {
-    show_no_algorithm_warning_ = true;
-    already_shown_warning = true;
+  // Storage for selection state
+  static std::string selected_meta_algorithm;
+  static std::string selected_generator;
+  static std::vector<std::string> selected_searches;
+  static std::vector<bool> search_selections;
+  static int iterations_or_starts = 10;
+
+  // Get available generators and searches
+  std::vector<std::string> generators = AlgorithmRegistry::getAvailableGenerators();
+  std::vector<std::string> searches = AlgorithmRegistry::getAvailableSearches();
+
+  // Initialize search selections array if needed
+  if (search_selections.size() != searches.size()) {
+    search_selections.resize(searches.size(), false);
   }
 
-  ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Algorithm Selection");
-  ImGui::Separator();
-
+  // Step 1: Select meta-algorithm
+  ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Step 1: Select Metaheuristic");
   if (ImGui::BeginCombo(
-        "Algorithm",
-        problem_manager_->getSelectedAlgorithm().empty()
-          ? "Select Algorithm"
-          : problem_manager_->getSelectedAlgorithm().c_str(),
-        has_algorithms ? 0 : ImGuiComboFlags_NoArrowButton
+        "Metaheuristic",
+        selected_meta_algorithm.empty() ? "Select Algorithm" : selected_meta_algorithm.c_str()
       )) {
-    if (has_algorithms) {
-      for (const auto& algo : algorithms) {
-        bool is_selected = algo == problem_manager_->getSelectedAlgorithm();
-        if (ImGui::Selectable(algo.c_str(), is_selected)) {
-          problem_manager_->setSelectedAlgorithm(algo);
-        }
+    for (const auto& algo : meta_algorithms) {
+      bool is_selected = (selected_meta_algorithm == algo);
+      if (ImGui::Selectable(algo.c_str(), is_selected)) {
+        selected_meta_algorithm = algo;
 
-        if (ImGui::IsItemHovered() && !AlgorithmRegistry::getDescription(algo).empty()) {
-          ImGui::BeginTooltip();
-          float wrap_width = 350.0f; // Set a wider width for the tooltip text
-          ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + wrap_width);
-          ImGui::TextUnformatted(AlgorithmRegistry::getDescription(algo).c_str());
-          ImGui::PopTextWrapPos();
-          ImGui::EndTooltip();
-        }
-
-        if (is_selected) {
-          ImGui::SetItemDefaultFocus();
+        // Reset other selections when changing meta-algorithm
+        if (algo == "MultiStart") {
+          iterations_or_starts = 10;  // Default for MultiStart
+        } else if (algo == "GVNS") {
+          iterations_or_starts = 50;  // Default for GVNS
         }
       }
-    } else {
-      ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No algorithms available");
+
+      if (is_selected) {
+        ImGui::SetItemDefaultFocus();
+      }
+
+      // Display description on hover
+      if (ImGui::IsItemHovered()) {
+        ImGui::BeginTooltip();
+        if (algo == "GVNS") {
+          ImGui::TextUnformatted("General Variable Neighborhood Search metaheuristic");
+        } else if (algo == "MultiStart") {
+          ImGui::TextUnformatted("Multi-Start metaheuristic with local search");
+        } else if (algo == "VRPTSolver") {
+          ImGui::TextUnformatted("Complete VRPT solver (Phases 1 and 2)");
+        }
+        ImGui::EndTooltip();
+      }
     }
     ImGui::EndCombo();
   }
 
-  if (!has_algorithms) {
-    ImGui::Spacing();
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
-    ImGui::TextWrapped(
-      "Warning: No algorithms available. Make sure algorithms are registered correctly."
-    );
-    ImGui::PopStyleColor();
-  }
+  // Only continue if a meta-algorithm is selected
+  if (!selected_meta_algorithm.empty()) {
+    ImGui::Separator();
 
-  ImGui::Separator();
+    // Step 2: Parameters for the selected meta-algorithm
+    ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Step 2: Configure Parameters");
 
-  ImGui::BeginDisabled(!problem_manager_->hasValidAlgorithmSelection());
-  if (ImGui::Button("Run Algorithm", ImVec2(-FLT_MIN, 0))) {
-    problem_manager_->runAlgorithm();
-  }
-  ImGui::EndDisabled();
+    if (selected_meta_algorithm == "GVNS") {
+      ImGui::SliderInt("Max Iterations", &iterations_or_starts, 1, 100);
+    } else if (selected_meta_algorithm == "MultiStart") {
+      ImGui::SliderInt("Number of Starts", &iterations_or_starts, 1, 50);
+    }
 
-  if (!problem_manager_->hasValidAlgorithmSelection()) {
-    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Select an algorithm to run");
+    // Step 3: Select generator
+    if (selected_meta_algorithm != "VRPTSolver") {  // VRPTSolver doesn't need a generator selection
+      ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Step 3: Select Solution Generator");
+
+      if (ImGui::BeginCombo(
+            "Generator",
+            selected_generator.empty() ? "Select Generator" : selected_generator.c_str()
+          )) {
+        for (const auto& gen : generators) {
+          bool is_selected = (selected_generator == gen);
+          if (ImGui::Selectable(gen.c_str(), is_selected)) {
+            selected_generator = gen;
+          }
+
+          if (is_selected) {
+            ImGui::SetItemDefaultFocus();
+          }
+
+          // Display description on hover
+          if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::TextUnformatted(("Generator for initial solutions: " + gen).c_str());
+            ImGui::EndTooltip();
+          }
+        }
+        ImGui::EndCombo();
+      }
+    }
+
+    // Step 4: Select search algorithms
+    if (selected_meta_algorithm != "VRPTSolver") {
+      ImGui::TextColored(
+        ImVec4(0.6f, 0.8f, 1.0f, 1.0f),
+        selected_meta_algorithm == "GVNS" ? "Step 4: Select Neighborhood Structures"
+                                          : "Step 4: Select Local Search"
+      );
+
+      ImGui::BeginChild("SearchesChild", ImVec2(0, 120), true);
+
+      for (size_t i = 0; i < searches.size(); i++) {
+        if (selected_meta_algorithm == "GVNS") {
+          // For GVNS, allow multiple selections
+          bool is_checked = search_selections[i];
+          if (ImGui::Checkbox(searches[i].c_str(), &is_checked)) {
+            search_selections[i] = is_checked;
+          }
+        } else if (selected_meta_algorithm == "MultiStart") {
+          // For MultiStart, only allow one selection
+          bool is_selected = (selected_searches.size() == 1 && selected_searches[0] == searches[i]);
+          if (ImGui::RadioButton(searches[i].c_str(), is_selected)) {
+            selected_searches.clear();
+            selected_searches.push_back(searches[i]);
+          }
+        }
+
+        // Display description on hover
+        if (ImGui::IsItemHovered()) {
+          ImGui::BeginTooltip();
+          ImGui::TextUnformatted(("Local search method: " + searches[i]).c_str());
+          ImGui::EndTooltip();
+        }
+      }
+
+      ImGui::EndChild();
+    } else if (selected_meta_algorithm == "VRPTSolver") {
+      // VRPTSolver uses defaults, no need for additional UI elements
+      ImGui::TextWrapped("VRPTSolver uses MultiStart for Phase 1 and GreedyTVScheduler for Phase 2"
+      );
+    }
+
+    ImGui::Separator();
+
+    // Construct algorithm name based on selections
+    std::string algorithm_name = "";
+    bool can_run = false;
+
+    if (selected_meta_algorithm == "GVNS") {
+      // GVNS requires a generator and at least one search
+      std::vector<std::string> selected_search_names;
+      for (size_t i = 0; i < searches.size(); i++) {
+        if (search_selections[i]) {
+          selected_search_names.push_back(searches[i]);
+        }
+      }
+
+      if (!selected_generator.empty() && !selected_search_names.empty()) {
+        algorithm_name = "GVNS";
+        selected_searches = selected_search_names;  // Store for later use
+        can_run = true;
+      }
+    } else if (selected_meta_algorithm == "MultiStart") {
+      // MultiStart requires a generator and exactly one search
+      if (!selected_generator.empty() && selected_searches.size() == 1) {
+        algorithm_name = "MultiStart";
+        can_run = true;
+      }
+    } else if (selected_meta_algorithm == "VRPTSolver") {
+      // VRPTSolver doesn't need additional selections
+      algorithm_name = "VRPTSolver";
+      can_run = true;
+    }
+
+    // Display the constructed algorithm and run button
+    if (can_run) {
+      problem_manager_->setSelectedAlgorithm(algorithm_name);
+      ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Algorithm Configuration Valid");
+    }
+
+    // Disable the button if configuration is invalid
+    if (!can_run) {
+      ImGui::BeginDisabled();
+    }
+
+    // Single button implementation
+    if (ImGui::Button("Run Algorithm", ImVec2(-FLT_MIN, 0))) {
+      if (can_run && problem_manager_->runAlgorithm()) {
+        // If algorithm successfully ran, update UI
+      } else {
+        show_no_algorithm_warning_ = true;
+      }
+    }
+
+    if (!can_run) {
+      ImGui::EndDisabled();
+    }
   }
 
   ImGui::End();
