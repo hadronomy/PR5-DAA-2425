@@ -215,7 +215,7 @@ class TVRoute {
     // Check duration constraint
     Duration return_time = problem.getTravelTime(swts_id, problem.getLandfill().id());
     if (new_time + return_time > max_duration_) {
-      return false;  // Can't add this pickup and return within time limit
+      return false;
     }
 
     // Add SWTS to route

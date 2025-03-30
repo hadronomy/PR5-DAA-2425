@@ -452,7 +452,10 @@ void UIComponents::RenderAlgorithmSelector() {
 
         if (ImGui::IsItemHovered() && !AlgorithmRegistry::getDescription(algo).empty()) {
           ImGui::BeginTooltip();
-          ImGui::TextWrapped("%s", AlgorithmRegistry::getDescription(algo).c_str());
+          float wrap_width = 350.0f; // Set a wider width for the tooltip text
+          ImGui::PushTextWrapPos(ImGui::GetCursorPos().x + wrap_width);
+          ImGui::TextUnformatted(AlgorithmRegistry::getDescription(algo).c_str());
+          ImGui::PopTextWrapPos();
           ImGui::EndTooltip();
         }
 

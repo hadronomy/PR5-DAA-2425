@@ -129,14 +129,18 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
     }
   }
 
-  // Draw all objects
+  // FIRST PASS: Draw all lines
   for (size_t i = 0; i < objects_.size(); i++) {
     auto& obj = objects_[i];
-    Vector2 pos = transformed_positions[i];
-    float sz = transformed_sizes[i];
 
-    // Check if this is a line object
-    if (obj.HasData("type") && obj.GetData("type") == "line") {
+    // Skip non-line objects in this pass
+    if (!obj.HasData("type") ||
+        (obj.GetData("type") != "line" && obj.GetData("type") != "dashed_line")) {
+      continue;
+    }
+
+    // Draw line objects
+    if (obj.GetData("type") == "line") {
       // Extract line endpoints
       float startX = std::stof(obj.GetData("startX"));
       float startY = std::stof(obj.GetData("startY"));
@@ -161,10 +165,9 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
 
       // Draw the line with adjusted thickness
       DrawLineEx({startX, startY}, {endX, endY}, adjustedThickness, obj.color);
-      continue;
     }
-    // Check if this is a dashed line object
-    else if (obj.HasData("type") && obj.GetData("type") == "dashed_line") {
+    // Draw dashed line objects
+    else if (obj.GetData("type") == "dashed_line") {
       // Extract line endpoints
       float startX = std::stof(obj.GetData("startX"));
       float startY = std::stof(obj.GetData("startY"));
@@ -225,6 +228,18 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
         // Draw with adjusted thickness
         DrawLineEx(dashStart, dashEnd, adjustedThickness, obj.color);
       }
+    }
+  }
+
+  // SECOND PASS: Draw all shapes
+  for (size_t i = 0; i < objects_.size(); i++) {
+    auto& obj = objects_[i];
+    Vector2 pos = transformed_positions[i];
+    float sz = transformed_sizes[i];
+
+    // Skip line objects in this pass
+    if (obj.HasData("type") &&
+        (obj.GetData("type") == "line" || obj.GetData("type") == "dashed_line")) {
       continue;
     }
 
