@@ -91,12 +91,24 @@ class GreedyCVGenerator : public ::meta::SolutionGenerator<VRPTSolution, VRPTPro
           // Cannot add a zone directly (lines 15-16)
           // Check if going to SWTS is feasible time-wise
           const auto& current_loc = problem.getLocation(current_location_id);
+
+          // If we're already at an SWTS and can't find any feasible zones,
+          // there's no point in visiting another SWTS - break the loop
+          if (current_loc.type() == LocationType::SWTS) {
+            break;
+          }
+
           auto nearest_swts = problem.findNearest(current_loc, LocationType::SWTS);
+
+          if (!nearest_swts) {
+            break;  // No SWTS found, can't continue
+          }
 
           if (nearest_swts && route.canVisit(nearest_swts->id(), problem)) {
             // Go to SWTS and reset capacity (lines 17-20)
             route.addLocation(nearest_swts->id(), problem);
             current_location_id = nearest_swts->id();
+            // After visiting SWTS, we'll try to find feasible zones in the next iteration
           } else {
             // Cannot continue this route (line 22)
             break;

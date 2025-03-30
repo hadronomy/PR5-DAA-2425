@@ -441,19 +441,19 @@ class KDTree {
     locations_.clear();
     time_matrix_.clear();
 
-    // Use ranges for transforming locations to points
-    auto point_containers =
-      locations | std::ranges::views::transform([](const auto& loc) {
-        return
-          typename GenericKDTree<LocationAdapter>::PointContainer{LocationAdapter(loc), loc.id()};
-      }) |
-      std::ranges::to<std::vector>();
-
-    // Store locations in map using ranges
+    // First store locations in map using ranges
     locations_ =
       locations |
       std::ranges::views::transform([](const auto& loc) { return std::pair{loc.id(), loc}; }) |
       std::ranges::to<std::unordered_map<std::string, Location>>();
+
+    // Then create adapters that reference the stored locations
+    auto point_containers =
+      locations_ | std::ranges::views::transform([](const auto& pair) {
+        const auto& [id, loc] = pair;
+        return typename GenericKDTree<LocationAdapter>::PointContainer{LocationAdapter(loc), id};
+      }) |
+      std::ranges::to<std::vector>();
 
     tree_.build(std::move(point_containers));
 
