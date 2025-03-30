@@ -49,6 +49,9 @@ bool ProblemManager::scanDirectory(const std::string& dir_path) {
 }
 
 bool ProblemManager::loadProblem(const std::string& filename) {
+  // Clear any existing solution when loading a new problem
+  clearSolution();
+
   // Check if we already have this problem loaded
   if (problems_.find(filename) != problems_.end()) {
     // Use existing problem instance
@@ -170,24 +173,12 @@ const std::vector<std::string>& ProblemManager::getAvailableProblemFiles() const
   return available_problems_;
 }
 
-std::vector<std::string> ProblemManager::getAvailableGenerators() const {
-  return AlgorithmRegistry::getAvailableGenerators();
-}
-
-std::vector<std::string> ProblemManager::getAvailableSearches() const {
-  return AlgorithmRegistry::getAvailableSearches();
-}
-
-void ProblemManager::setSelectedGenerator(const std::string& name) {
-  selected_generator_ = name;
-}
-
-void ProblemManager::setSelectedSearch(const std::string& name) {
-  selected_search_ = name;
+void ProblemManager::setSelectedAlgorithm(const std::string& name) {
+  selected_algorithm_ = name;
 }
 
 bool ProblemManager::hasValidAlgorithmSelection() const {
-  return !selected_generator_.empty() && !selected_search_.empty();
+  return !selected_algorithm_.empty() && AlgorithmRegistry::exists(selected_algorithm_);
 }
 
 bool ProblemManager::runAlgorithm() {
@@ -195,9 +186,37 @@ bool ProblemManager::runAlgorithm() {
     return false;
   }
 
-  // This is where you would implement the algorithm execution
-  // For now, just return true to indicate success
-  return true;
+  try {
+    VRPTProblem* problem = getCurrentProblem();
+    if (!problem) {
+      return false;
+    }
+
+    // Create and run the algorithm
+    auto algorithm =
+      AlgorithmRegistry::createTyped<VRPTProblem, algorithm::VRPTSolution>(selected_algorithm_);
+    if (!algorithm) {
+      return false;
+    }
+
+    // Clear any existing solution
+    solution_.reset();
+
+    // Run the algorithm with a timeout
+    auto solution = algorithm->solveWithTimeLimit(*problem);
+
+    // Store the solution
+    solution_ = std::make_unique<algorithm::VRPTSolution>(solution);
+
+    std::cout << "Algorithm " << selected_algorithm_ << " executed successfully" << std::endl;
+    std::cout << "Solution uses " << solution_->getCVCount() << " collection vehicles and "
+              << solution_->getTVCount() << " transportation vehicles" << std::endl;
+
+    return true;
+  } catch (const std::exception& e) {
+    std::cerr << "Error running algorithm: " << e.what() << std::endl;
+    return false;
+  }
 }
 
 }  // namespace visualization

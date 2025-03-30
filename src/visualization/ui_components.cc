@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "imgui.h"
@@ -422,15 +423,12 @@ void UIComponents::RenderAlgorithmSelector() {
     return;
   }
 
-  std::vector<std::string> generators = problem_manager_->getAvailableGenerators();
-  std::vector<std::string> searches = problem_manager_->getAvailableSearches();
-
-  bool has_generators = !generators.empty();
-  bool has_searches = !searches.empty();
+  std::vector<std::string> algorithms = AlgorithmRegistry::availableAlgorithms();
+  bool has_algorithms = !algorithms.empty();
 
   // Show warning only once when we detect there are no algorithms
   static bool already_shown_warning = false;
-  if (!has_generators && !has_searches && !already_shown_warning) {
+  if (!has_algorithms && !already_shown_warning) {
     show_no_algorithm_warning_ = true;
     already_shown_warning = true;
   }
@@ -439,57 +437,40 @@ void UIComponents::RenderAlgorithmSelector() {
   ImGui::Separator();
 
   if (ImGui::BeginCombo(
-        "Solution Generator",
-        problem_manager_->getSelectedGenerator().empty()
-          ? "Select Generator"
-          : problem_manager_->getSelectedGenerator().c_str(),
-        has_generators ? 0 : ImGuiComboFlags_NoArrowButton
+        "Algorithm",
+        problem_manager_->getSelectedAlgorithm().empty()
+          ? "Select Algorithm"
+          : problem_manager_->getSelectedAlgorithm().c_str(),
+        has_algorithms ? 0 : ImGuiComboFlags_NoArrowButton
       )) {
-    if (has_generators) {
-      for (const auto& gen : generators) {
-        bool is_selected = gen == problem_manager_->getSelectedGenerator();
-        if (ImGui::Selectable(gen.c_str(), is_selected)) {
-          problem_manager_->setSelectedGenerator(gen);
+    if (has_algorithms) {
+      for (const auto& algo : algorithms) {
+        bool is_selected = algo == problem_manager_->getSelectedAlgorithm();
+        if (ImGui::Selectable(algo.c_str(), is_selected)) {
+          problem_manager_->setSelectedAlgorithm(algo);
         }
+
+        if (ImGui::IsItemHovered() && !AlgorithmRegistry::getDescription(algo).empty()) {
+          ImGui::BeginTooltip();
+          ImGui::TextWrapped("%s", AlgorithmRegistry::getDescription(algo).c_str());
+          ImGui::EndTooltip();
+        }
+
         if (is_selected) {
           ImGui::SetItemDefaultFocus();
         }
       }
     } else {
-      ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No generators available");
+      ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No algorithms available");
     }
     ImGui::EndCombo();
   }
 
-  if (ImGui::BeginCombo(
-        "Local Search",
-        problem_manager_->getSelectedSearch().empty()
-          ? "Select Search"
-          : problem_manager_->getSelectedSearch().c_str(),
-        has_searches ? 0 : ImGuiComboFlags_NoArrowButton
-      )) {
-    if (has_searches) {
-      for (const auto& search : searches) {
-        bool is_selected = search == problem_manager_->getSelectedSearch();
-        if (ImGui::Selectable(search.c_str(), is_selected)) {
-          problem_manager_->setSelectedSearch(search);
-        }
-        if (is_selected) {
-          ImGui::SetItemDefaultFocus();
-        }
-      }
-    } else {
-      ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No searches available");
-    }
-    ImGui::EndCombo();
-  }
-
-  if (!has_generators || !has_searches) {
+  if (!has_algorithms) {
     ImGui::Spacing();
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.4f, 0.4f, 1.0f));
     ImGui::TextWrapped(
-      "Warning: Some algorithm components are missing. Make sure algorithms are registered "
-      "correctly."
+      "Warning: No algorithms available. Make sure algorithms are registered correctly."
     );
     ImGui::PopStyleColor();
   }
@@ -503,9 +484,7 @@ void UIComponents::RenderAlgorithmSelector() {
   ImGui::EndDisabled();
 
   if (!problem_manager_->hasValidAlgorithmSelection()) {
-    ImGui::TextColored(
-      ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Select both a generator and a search algorithm to run"
-    );
+    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "Select an algorithm to run");
   }
 
   ImGui::End();
@@ -559,6 +538,9 @@ void UIComponents::RenderProblemVisualization() {
   max_x += padding;
   max_y += padding;
 
+  // Create location ID to coordinate mapping for drawing routes
+  std::unordered_map<std::string, Vector2> location_coords;
+
   // Add depot with additional data
   auto& depot_obj = object_manager_->AddObject(
     {static_cast<float>(depot.x()), static_cast<float>(depot.y())},
@@ -570,6 +552,9 @@ void UIComponents::RenderProblemVisualization() {
   depot_obj.AddData("Type", "Depot");
   depot_obj.AddData("Description", "Starting point for all vehicles");
 
+  // Store depot coordinates
+  location_coords[depot.id()] = {static_cast<float>(depot.x()), static_cast<float>(depot.y())};
+
   // Add landfill with additional data
   auto& landfill_obj = object_manager_->AddObject(
     {static_cast<float>(landfill.x()), static_cast<float>(landfill.y())},
@@ -580,6 +565,11 @@ void UIComponents::RenderProblemVisualization() {
   );
   landfill_obj.AddData("Type", "Landfill");
   landfill_obj.AddData("Description", "Final disposal site for waste");
+
+  // Store landfill coordinates
+  location_coords[landfill.id()] = {
+    static_cast<float>(landfill.x()), static_cast<float>(landfill.y())
+  };
 
   // Add transfer stations with additional data
   for (const auto& station : stations) {
@@ -593,6 +583,11 @@ void UIComponents::RenderProblemVisualization() {
     station_obj.AddData("Type", "Transfer Station");
     station_obj.AddData("ID", station.id());
     station_obj.AddData("Name", station.name());
+
+    // Store station coordinates
+    location_coords[station.id()] = {
+      static_cast<float>(station.x()), static_cast<float>(station.y())
+    };
   }
 
   // Add collection zones with additional data
@@ -620,6 +615,132 @@ void UIComponents::RenderProblemVisualization() {
     service_time_ss << std::fixed << std::setprecision(2)
                     << zone.serviceTime().value(units::TimeUnit::Seconds) << " seconds";
     zone_obj.AddData("Service Time", service_time_ss.str());
+
+    // Store zone coordinates
+    location_coords[zone.id()] = {static_cast<float>(zone.x()), static_cast<float>(zone.y())};
+  }
+
+  // Draw solution routes if available
+  if (problem_manager_->hasSolution()) {
+    const auto* solution = problem_manager_->getSolution();
+
+    // Draw CV routes
+    const auto& cv_routes = solution->getCVRoutes();
+    for (size_t i = 0; i < cv_routes.size(); ++i) {
+      const auto& route = cv_routes[i];
+      const auto& locations = route.locationIds();
+
+      if (locations.empty())
+        continue;
+
+      // Generate route color with transparency (vary the hue for different routes)
+      // Add transparency by setting alpha to 180 (about 70% opacity)
+      Color route_color = ColorFromHSV(240.0f * (i % 5) / 5.0f, 0.7f, 0.9f);
+      route_color.a = 180;  // Add transparency
+
+      // Add route information
+      std::ostringstream route_name;
+      route_name << "CV Route " << (i + 1);
+
+      // Add the depot as starting point
+      std::string prev_id = problem->getDepot().id();
+      Vector2 prev_pos = location_coords[prev_id];
+
+      for (size_t j = 0; j < locations.size(); ++j) {
+        const auto& loc_id = locations[j];
+
+        // Skip if location not found in mapping
+        if (location_coords.find(loc_id) == location_coords.end())
+          continue;
+
+        Vector2 curr_pos = location_coords[loc_id];
+
+        // Draw route segment with reduced thickness (half of previous value)
+        object_manager_->AddLine(prev_pos, curr_pos, route_color, 75.0f, route_name.str());
+
+        prev_id = loc_id;
+        prev_pos = curr_pos;
+      }
+
+      // Close route back to depot if needed
+      if (prev_id != problem->getDepot().id() && !locations.empty()) {
+        object_manager_->AddLine(
+          prev_pos, location_coords[problem->getDepot().id()], route_color, 75.0f, route_name.str()
+        );
+      }
+    }
+
+    // Draw TV routes
+    const auto& tv_routes = solution->getTVRoutes();
+    for (size_t i = 0; i < tv_routes.size(); ++i) {
+      const auto& route = tv_routes[i];
+      const auto& locations = route.locationIds();
+
+      if (locations.empty())
+        continue;
+
+      // Generate TV route color with transparency (yellow-orange range)
+      // Add transparency by setting alpha to 180 (about 70% opacity)
+      Color route_color = ColorFromHSV(30.0f + 20.0f * (i % 5) / 5.0f, 0.8f, 0.9f);
+      route_color.a = 180;  // Add transparency
+
+      // Add route information
+      std::ostringstream route_name;
+      route_name << "TV Route " << (i + 1);
+
+      // Add the landfill as starting point
+      std::string prev_id = problem->getLandfill().id();
+      Vector2 prev_pos = location_coords[prev_id];
+
+      for (size_t j = 0; j < locations.size(); ++j) {
+        const auto& loc_id = locations[j];
+
+        // Skip if location not found in mapping
+        if (location_coords.find(loc_id) == location_coords.end())
+          continue;
+
+        Vector2 curr_pos = location_coords[loc_id];
+
+        // Draw route segment with reduced thickness (half of previous value)
+        object_manager_->AddDashedLine(
+          prev_pos, curr_pos, route_color, 100.0f, 15.0f, route_name.str()
+        );
+
+        prev_id = loc_id;
+        prev_pos = curr_pos;
+      }
+
+      // Close route back to landfill if needed
+      if (prev_id != problem->getLandfill().id() && !locations.empty()) {
+        object_manager_->AddDashedLine(
+          prev_pos,
+          location_coords[problem->getLandfill().id()],
+          route_color,
+          100.0f,
+          15.0f,
+          route_name.str()
+        );
+      }
+    }
+
+    // Add solution info legend
+    ImVec2 legend_pos = ImGui::GetWindowPos();
+    legend_pos.x += 10;
+    legend_pos.y += ImGui::GetWindowHeight() - 80;
+
+    ImGui::SetNextWindowPos(legend_pos);
+    ImGui::SetNextWindowBgAlpha(0.7f);
+    if (ImGui::Begin(
+          "Solution Info",
+          nullptr,
+          ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings
+        )) {
+      ImGui::Text("Solution: %s", problem_manager_->getSelectedAlgorithm().c_str());
+      ImGui::Text("CV Routes: %zu", cv_routes.size());
+      ImGui::Text("TV Routes: %zu", tv_routes.size());
+      ImGui::End();
+    }
   }
 }
 

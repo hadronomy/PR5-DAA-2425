@@ -43,6 +43,60 @@ void ObjectManager::ClearObjects() {
   objects_.clear();
 }
 
+void ObjectManager::AddLine(
+  const Vector2& start,
+  const Vector2& end,
+  Color color,
+  float thickness,
+  const std::string& label
+) {
+  // Create a line object at the midpoint
+  GraphicalObject line(
+    {(start.x + end.x) / 2.0f, (start.y + end.y) / 2.0f},  // position at midpoint
+    thickness,                                             // use thickness as size
+    color,
+    label
+  );
+
+  // Store line properties as data
+  line.AddData("type", "line");
+  line.AddData("startX", std::to_string(start.x));
+  line.AddData("startY", std::to_string(start.y));
+  line.AddData("endX", std::to_string(end.x));
+  line.AddData("endY", std::to_string(end.y));
+
+  // Add the line object to our collection
+  objects_.push_back(line);
+}
+
+void ObjectManager::AddDashedLine(
+  const Vector2& start,
+  const Vector2& end,
+  Color color,
+  float thickness,
+  float dash_length,
+  const std::string& label
+) {
+  // Similar to AddLine, but we'll mark it as a dashed line
+  GraphicalObject line(
+    {(start.x + end.x) / 2.0f, (start.y + end.y) / 2.0f},  // position at midpoint
+    thickness,                                             // use thickness as size
+    color,
+    label
+  );
+
+  // Store line properties as data
+  line.AddData("type", "dashed_line");
+  line.AddData("startX", std::to_string(start.x));
+  line.AddData("startY", std::to_string(start.y));
+  line.AddData("endX", std::to_string(end.x));
+  line.AddData("endY", std::to_string(end.y));
+  line.AddData("dashLength", std::to_string(dash_length));
+
+  // Add the line object to our collection
+  objects_.push_back(line);
+}
+
 void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float scale) {
   // First, collect all transformed positions for overlap detection
   std::vector<Vector2> transformed_positions(objects_.size());
@@ -80,6 +134,99 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
     auto& obj = objects_[i];
     Vector2 pos = transformed_positions[i];
     float sz = transformed_sizes[i];
+
+    // Check if this is a line object
+    if (obj.HasData("type") && obj.GetData("type") == "line") {
+      // Extract line endpoints
+      float startX = std::stof(obj.GetData("startX"));
+      float startY = std::stof(obj.GetData("startY"));
+      float endX = std::stof(obj.GetData("endX"));
+      float endY = std::stof(obj.GetData("endY"));
+
+      // Apply transformations to endpoints if needed
+      if (use_transformation) {
+        startX = startX * scale + offset.x;
+        startY = startY * scale + offset.y;
+        endX = endX * scale + offset.x;
+        endY = endY * scale + offset.y;
+      }
+
+      // Calculate a thickness that remains visible when zoomed out with reduced values
+      float adjustedThickness = use_transformation
+                                ? fmaxf(obj.size / (scale > 0.01f ? scale : 0.01f), 15.0f)
+                                : fmaxf(obj.size, 15.0f);
+
+      // Reduced cap on maximum thickness
+      adjustedThickness = fminf(adjustedThickness, 250.0f);
+
+      // Draw the line with adjusted thickness
+      DrawLineEx({startX, startY}, {endX, endY}, adjustedThickness, obj.color);
+      continue;
+    }
+    // Check if this is a dashed line object
+    else if (obj.HasData("type") && obj.GetData("type") == "dashed_line") {
+      // Extract line endpoints
+      float startX = std::stof(obj.GetData("startX"));
+      float startY = std::stof(obj.GetData("startY"));
+      float endX = std::stof(obj.GetData("endX"));
+      float endY = std::stof(obj.GetData("endY"));
+      float dashLength = std::stof(obj.GetData("dashLength"));
+
+      // Apply transformations to endpoints if needed
+      if (use_transformation) {
+        startX = startX * scale + offset.x;
+        startY = startY * scale + offset.y;
+        endX = endX * scale + offset.x;
+        endY = endY * scale + offset.y;
+      }
+
+      // Calculate thickness with reduced values
+      float adjustedThickness = use_transformation
+                                ? fmaxf(obj.size / (scale > 0.01f ? scale : 0.01f), 20.0f)
+                                : fmaxf(obj.size, 20.0f);
+
+      // Reduced cap on maximum thickness
+      adjustedThickness = fminf(adjustedThickness, 300.0f);
+
+      // Also adjust dash length based on zoom, with reduced minimum values
+      float adjustedDashLength =
+        use_transformation ? fmaxf(dashLength * scale, 8.0f) : fmaxf(dashLength, 8.0f);
+
+      // Draw dashed line
+      Vector2 start = {startX, startY};
+      Vector2 end = {endX, endY};
+
+      // Calculate the direction and total length
+      Vector2 dir = {end.x - start.x, end.y - start.y};
+      float length = sqrtf(dir.x * dir.x + dir.y * dir.y);
+
+      // Normalize direction
+      if (length > 0) {
+        dir.x /= length;
+        dir.y /= length;
+      }
+
+      // Draw dashed segments
+      float dashCount = length / (adjustedDashLength * 2);
+      for (float i = 0; i < dashCount; i++) {
+        Vector2 dashStart = {
+          start.x + dir.x * i * adjustedDashLength * 2, start.y + dir.y * i * adjustedDashLength * 2
+        };
+
+        Vector2 dashEnd = {
+          dashStart.x + dir.x * adjustedDashLength, dashStart.y + dir.y * adjustedDashLength
+        };
+
+        // Make sure we don't exceed the end point
+        if (Vector2Distance(start, dashEnd) > length) {
+          dashEnd = end;
+        }
+
+        // Draw with adjusted thickness
+        DrawLineEx(dashStart, dashEnd, adjustedThickness, obj.color);
+      }
+      continue;
+    }
 
     // Draw the object shape
     DrawShape(pos, sz, obj.shape, obj.color);

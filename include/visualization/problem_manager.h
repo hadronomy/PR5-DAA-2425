@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "algorithms/vrpt_solution.h"
 #include "problem/vrpt_problem.h"
 #include "raylib.h"
 
@@ -42,17 +43,11 @@ class ProblemManager {
   // Get list of available problems
   const std::vector<std::string>& getAvailableProblemFiles() const;
 
-  // Get available algorithms
-  std::vector<std::string> getAvailableGenerators() const;
-  std::vector<std::string> getAvailableSearches() const;
+  // Set selected algorithm
+  void setSelectedAlgorithm(const std::string& name);
 
-  // Set selected algorithms
-  void setSelectedGenerator(const std::string& name);
-  void setSelectedSearch(const std::string& name);
-
-  // Get selected algorithms
-  const std::string& getSelectedGenerator() const { return selected_generator_; }
-  const std::string& getSelectedSearch() const { return selected_search_; }
+  // Get selected algorithm
+  const std::string& getSelectedAlgorithm() const { return selected_algorithm_; }
 
   // Check if algorithm selection is valid
   bool hasValidAlgorithmSelection() const;
@@ -62,6 +57,11 @@ class ProblemManager {
 
   // Get the bounds of the current problem
   Rectangle GetCurrentProblemBounds() const;
+
+  // Solution-related methods
+  bool hasSolution() const { return solution_ != nullptr; }
+  const algorithm::VRPTSolution* getSolution() const { return solution_.get(); }
+  void clearSolution() { solution_.reset(); }
 
  private:
   // Map of filename to problem instance
@@ -73,9 +73,11 @@ class ProblemManager {
   // List of available problem files
   std::vector<std::string> available_problems_;
 
-  // Selected algorithms
-  std::string selected_generator_;
-  std::string selected_search_;
+  // Selected algorithm
+  std::string selected_algorithm_;
+
+  // Current solution
+  std::unique_ptr<algorithm::VRPTSolution> solution_;
 
   // Callback to notify when a problem is loaded
   ProblemLoadedCallback problem_loaded_callback_;

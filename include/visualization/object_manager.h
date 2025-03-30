@@ -78,6 +78,25 @@ class ObjectManager {
   // Access objects
   const std::vector<GraphicalObject>& GetObjects() const { return objects_; }
 
+  // Add a line between two points
+  void AddLine(
+    const Vector2& start,
+    const Vector2& end,
+    Color color,
+    float thickness = 2.0f,
+    const std::string& label = ""
+  );
+
+  // Add a dashed line between two points
+  void AddDashedLine(
+    const Vector2& start,
+    const Vector2& end,
+    Color color,
+    float thickness = 2.0f,
+    float dash_length = 5.0f,
+    const std::string& label = ""
+  );
+
  private:
   std::vector<GraphicalObject> objects_;
 
