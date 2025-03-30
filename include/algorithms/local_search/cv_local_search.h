@@ -1,6 +1,7 @@
 #pragma once
 
 #include "algorithms/vrpt_solution.h"
+#include "imgui.h"
 #include "meta_heuristic_components.h"
 #include "problem/vrpt_problem.h"
 
@@ -87,6 +88,14 @@ class CVLocalSearch : public ::meta::LocalSearch<VRPTSolution, VRPTProblem> {
    */
   virtual VRPTSolution
     searchNeighborhood(const VRPTProblem& problem, const VRPTSolution& current_solution) = 0;
+
+  /**
+   * @brief Render UI elements for configuring this local search algorithm
+   */
+  void renderConfigurationUI() override {
+    ImGui::SliderInt("Max Iterations", &max_iterations_, 1, 1000);
+    ImGui::Checkbox("First Improvement", &first_improvement_);
+  }
 
  protected:
   int max_iterations_ = 100;

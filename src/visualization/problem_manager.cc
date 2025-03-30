@@ -216,7 +216,6 @@ void ProblemManager::renderAlgorithmConfigurationUI() {
     if (!isAlgorithmSelected()) {
       return;
     }
-
     // Create the algorithm instance if it doesn't exist
     try {
       current_algorithm_ =

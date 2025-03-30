@@ -42,6 +42,11 @@ requires Solution<S, P> class SolutionGenerator {
    * @brief Get the name of this generator
    */
   virtual std::string name() const = 0;
+
+  /**
+   * @brief Render UI components for configuring this generator
+   */
+  virtual void renderConfigurationUI() {}
 };
 
 /**
@@ -67,6 +72,11 @@ requires Solution<S, P> class LocalSearch {
    * @brief Get the name of this local search strategy
    */
   virtual std::string name() const = 0;
+
+  /**
+   * @brief Render UI components for configuring this local search
+   */
+  virtual void renderConfigurationUI() {}
 };
 
 }  // namespace meta

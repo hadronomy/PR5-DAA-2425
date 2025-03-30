@@ -16,6 +16,16 @@ void MultiStart::renderConfigurationUI() {
       bool is_selected = (generator_name_ == gen);
       if (ImGui::Selectable(gen.c_str(), is_selected)) {
         generator_name_ = gen;
+        // Create new generator instance when selection changes
+        using MetaFactory = MetaHeuristicFactory<
+          VRPTSolution,
+          VRPTProblem,
+          TypedAlgorithm<VRPTProblem, VRPTSolution>>;
+        try {
+          generator_ = MetaFactory::createGenerator(generator_name_);
+        } catch (const std::exception&) {
+          generator_.reset();
+        }
       }
       if (is_selected) {
         ImGui::SetItemDefaultFocus();
@@ -32,12 +42,40 @@ void MultiStart::renderConfigurationUI() {
       bool is_selected = (search_name_ == search);
       if (ImGui::Selectable(search.c_str(), is_selected)) {
         search_name_ = search;
+        // Create new local search instance when selection changes
+        using MetaFactory = MetaHeuristicFactory<
+          VRPTSolution,
+          VRPTProblem,
+          TypedAlgorithm<VRPTProblem, VRPTSolution>>;
+        try {
+          local_search_ = MetaFactory::createSearch(search_name_);
+        } catch (const std::exception&) {
+          local_search_.reset();
+        }
       }
       if (is_selected) {
         ImGui::SetItemDefaultFocus();
       }
     }
     ImGui::EndCombo();
+  }
+
+  // Generator configuration
+  if (generator_ && !generator_name_.empty()) {
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0.3f, 0.8f, 0.3f, 1.0f), "Generator Configuration:");
+    ImGui::Indent(10.0f);
+    generator_->renderConfigurationUI();
+    ImGui::Unindent(10.0f);
+  }
+
+  // Local search configuration
+  if (local_search_ && !search_name_.empty()) {
+    ImGui::Separator();
+    ImGui::TextColored(ImVec4(0.3f, 0.8f, 0.3f, 1.0f), "Local Search Configuration:");
+    ImGui::Indent(10.0f);
+    local_search_->renderConfigurationUI();
+    ImGui::Unindent(10.0f);
   }
 }
 

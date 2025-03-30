@@ -8,6 +8,7 @@
 
 #include "algorithm_registry.h"
 #include "algorithms/vrpt_solution.h"
+#include "imgui.h"
 #include "meta_heuristic_components.h"
 #include "meta_heuristic_factory.h"
 #include "problem/vrpt_problem.h"
@@ -96,6 +97,27 @@ class GRASPCVGenerator : public ::meta::SolutionGenerator<VRPTSolution, VRPTProb
   std::string name() const override {
     return "GRASP CV Generator (alpha=" + std::to_string(alpha_) +
            ", rcl_size=" + std::to_string(rcl_size_) + ")";
+  }
+
+  /**
+   * @brief Render UI elements for configuring the GRASP generator
+   */
+  void renderConfigurationUI() override {
+    // Slider for alpha parameter (0.0 = pure greedy, 1.0 = pure random)
+    float alpha = static_cast<float>(alpha_);
+    if (ImGui::SliderFloat("Alpha", &alpha, 0.0f, 1.0f, "%.2f")) {
+      alpha_ = static_cast<double>(alpha);
+    }
+    ImGui::SameLine();
+    ImGui::HelpMarker("Alpha controls randomization: 0.0 = pure greedy, 1.0 = pure random");
+
+    // Input for RCL size
+    int rcl_size = static_cast<int>(rcl_size_);
+    if (ImGui::InputInt("RCL Size", &rcl_size)) {
+      rcl_size_ = std::max(1, rcl_size);  // Ensure at least 1
+    }
+    ImGui::SameLine();
+    ImGui::HelpMarker("Maximum size of the Restricted Candidate List");
   }
 
  private:

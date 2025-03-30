@@ -6,6 +6,7 @@
 
 #include "algorithm_registry.h"
 #include "algorithms/vrpt_solution.h"
+#include "imgui.h"
 #include "meta_heuristic_components.h"
 #include "meta_heuristic_factory.h"
 #include "problem/vrpt_problem.h"
@@ -126,6 +127,16 @@ class GreedyCVGenerator : public ::meta::SolutionGenerator<VRPTSolution, VRPTPro
   }
 
   std::string name() const override { return "Greedy CV Generator"; }
+
+  /**
+   * @brief Render UI elements for configuring the greedy generator
+   *
+   * This generator doesn't have configurable parameters, so we just display info.
+   */
+  void renderConfigurationUI() override {
+    ImGui::TextWrapped("The Greedy CV Generator has no configurable parameters.");
+    ImGui::TextWrapped("It always selects the closest feasible collection zone.");
+  }
 };
 
 // Register the algorithm

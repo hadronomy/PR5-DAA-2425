@@ -3,10 +3,12 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "algorithm_registry.h"
 #include "algorithms/vrpt_solution.h"
+#include "meta_heuristic_components.h"
 #include "meta_heuristic_factory.h"
 
 namespace daa {
@@ -29,28 +31,34 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
   )
       : max_iterations_(max_iterations),
         generator_name_(generator_name),
-        neighborhood_names_(std::move(neighborhoods)) {}
+        neighborhood_names_(std::move(neighborhoods)) {
+    // Initialize components
+    initializeComponents();
+  }
 
   VRPTSolution solve(const VRPTProblem& problem) override {
     using MetaFactory =
       MetaHeuristicFactory<VRPTSolution, VRPTProblem, TypedAlgorithm<VRPTProblem, VRPTSolution>>;
 
-    // Create generator
-    auto generator = MetaFactory::createGenerator(generator_name_);
+    // Create generator if not already created
+    if (!generator_) {
+      generator_ = MetaFactory::createGenerator(generator_name_);
+    }
 
-    // Create neighborhood searches
-    std::vector<std::unique_ptr<::meta::LocalSearch<VRPTSolution, VRPTProblem>>> neighborhoods;
-    for (const auto& name : neighborhood_names_) {
-      neighborhoods.push_back(MetaFactory::createSearch(name));
+    // Create neighborhood searches if not already created
+    if (neighborhoods_.empty()) {
+      for (const auto& name : neighborhood_names_) {
+        neighborhoods_.push_back(MetaFactory::createSearch(name));
+      }
     }
 
     // No neighborhoods defined
-    if (neighborhoods.empty()) {
-      return generator->generateSolution(problem);
+    if (neighborhoods_.empty()) {
+      return generator_->generateSolution(problem);
     }
 
     // Generate initial solution
-    VRPTSolution current_solution = generator->generateSolution(problem);
+    VRPTSolution current_solution = generator_->generateSolution(problem);
     VRPTSolution best_solution = current_solution;
     size_t best_cv_count = best_solution.getCVCount();
 
@@ -63,10 +71,10 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     while (iteration < max_iterations_) {
       // Variable neighborhood descent (VND)
       size_t k = 0;
-      while (k < neighborhoods.size()) {
+      while (k < neighborhoods_.size()) {
         // Apply current neighborhood search
         VRPTSolution improved_solution =
-          neighborhoods[k]->improveSolution(problem, current_solution);
+          neighborhoods_[k]->improveSolution(problem, current_solution);
 
         // Check if solution improved
         size_t improved_cv_count = improved_solution.getCVCount();
@@ -220,6 +228,87 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
   int max_iterations_;
   std::string generator_name_;
   std::vector<std::string> neighborhood_names_;
+
+  // Component instances for reuse
+  std::unique_ptr<::meta::SolutionGenerator<VRPTSolution, VRPTProblem>> generator_;
+  std::vector<std::unique_ptr<::meta::LocalSearch<VRPTSolution, VRPTProblem>>> neighborhoods_;
+
+  // Map to track neighborhood search instances by name for UI configuration
+  std::unordered_map<std::string, ::meta::LocalSearch<VRPTSolution, VRPTProblem>*> search_map_;
+
+  // Initialize/update components when configuration changes
+  void initializeComponents() {
+    using MetaFactory =
+      MetaHeuristicFactory<VRPTSolution, VRPTProblem, TypedAlgorithm<VRPTProblem, VRPTSolution>>;
+
+    try {
+      // Create generator
+      if (!generator_name_.empty()) {
+        generator_ = MetaFactory::createGenerator(generator_name_);
+      }
+
+      // Create neighborhood searches
+      neighborhoods_.clear();
+      search_map_.clear();
+
+      for (const auto& name : neighborhood_names_) {
+        auto search = MetaFactory::createSearch(name);
+        search_map_[name] = search.get();
+        neighborhoods_.push_back(std::move(search));
+      }
+    } catch (const std::exception&) {
+      // Initialization will be retried later if needed
+    }
+  }
+
+  // Update neighborhoods when selection changes
+  void updateNeighborhoods() {
+    using MetaFactory =
+      MetaHeuristicFactory<VRPTSolution, VRPTProblem, TypedAlgorithm<VRPTProblem, VRPTSolution>>;
+
+    // Create a copy of the current search map to track which ones to keep
+    std::unordered_map<std::string, ::meta::LocalSearch<VRPTSolution, VRPTProblem>*> existing_map =
+      search_map_;
+
+    // Clear current neighborhoods and rebuild
+    std::vector<std::unique_ptr<::meta::LocalSearch<VRPTSolution, VRPTProblem>>>
+      updated_neighborhoods;
+    std::unordered_map<std::string, ::meta::LocalSearch<VRPTSolution, VRPTProblem>*>
+      updated_search_map;
+
+    // Process each selected neighborhood name
+    for (const auto& name : neighborhood_names_) {
+      auto it = existing_map.find(name);
+
+      if (it != existing_map.end()) {
+        // This neighborhood already exists, reuse it
+        // Find the corresponding neighborhood in neighborhoods_
+        for (auto& neighborhood : neighborhoods_) {
+          if (neighborhood.get() == it->second) {
+            // Found it, move to updated list
+            updated_search_map[name] = neighborhood.get();
+            updated_neighborhoods.push_back(std::move(neighborhood));
+            break;
+          }
+        }
+        // Remove from existing map to mark as processed
+        existing_map.erase(name);
+      } else {
+        // This is a new neighborhood, create it
+        try {
+          auto search = MetaFactory::createSearch(name);
+          updated_search_map[name] = search.get();
+          updated_neighborhoods.push_back(std::move(search));
+        } catch (const std::exception&) {
+          // Skip if creation fails
+        }
+      }
+    }
+
+    // Update the member variables
+    neighborhoods_ = std::move(updated_neighborhoods);
+    search_map_ = std::move(updated_search_map);
+  }
 };
 
 // Register the algorithm with default parameters

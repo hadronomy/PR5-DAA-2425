@@ -1,5 +1,6 @@
 #pragma once
 
+#include "imgui.h"
 #if defined(_WIN32)
 // To avoid conflicting windows.h symbols with raylib, some flags are defined
 // WARNING: Those flags avoid inclusion of some Win32 headers that could be required
@@ -443,3 +444,17 @@ class UI {
 };
 
 }  // namespace daa
+
+namespace ImGui {
+// Helper to display a small (?) mark which shows a tooltip when hovered.
+inline void HelpMarker(const char* desc) {
+  ImGui::TextDisabled("(?)");
+  if (ImGui::IsItemHovered()) {
+    ImGui::BeginTooltip();
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+    ImGui::TextUnformatted(desc);
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+  }
+}
+}  // namespace ImGui
