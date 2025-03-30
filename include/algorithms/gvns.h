@@ -20,6 +20,7 @@ namespace algorithm {
  */
 class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
  public:
+  // Default constructor with default parameters
   explicit GVNS(
     int max_iterations = 50,
     const std::string& generator_name = "GRASPCVGenerator",
@@ -211,6 +212,9 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
   std::string timeComplexity() const override {
     return "O(k × i × n)";  // k = neighborhoods, i = iterations, n = complexity of each move
   }
+
+  // UI configuration rendering
+  void renderConfigurationUI() override;
 
  private:
   int max_iterations_;

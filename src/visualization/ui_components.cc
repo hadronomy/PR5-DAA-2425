@@ -423,201 +423,47 @@ void UIComponents::RenderAlgorithmSelector() {
     return;
   }
 
-  // Get meta-algorithm options (like GVNS, MultiStart)
-  static std::vector<std::string> meta_algorithms = {"GVNS", "MultiStart", "VRPTSolver"};
+  // Step 1: Select algorithm type
+  std::vector<std::string> meta_algorithms = {"GVNS", "MultiStart", "VRPTSolver"};
 
-  // Storage for selection state
-  static std::string selected_meta_algorithm;
-  static std::string selected_generator;
-  static std::vector<std::string> selected_searches;
-  static std::vector<bool> search_selections;
-  static int iterations_or_starts = 10;
+  ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Step 1: Select Algorithm");
 
-  // Get available generators and searches
-  std::vector<std::string> generators = AlgorithmRegistry::getAvailableGenerators();
-  std::vector<std::string> searches = AlgorithmRegistry::getAvailableSearches();
+  // Get the current algorithm name
+  std::string selected_algorithm = problem_manager_->getSelectedAlgorithm();
 
-  // Initialize search selections array if needed
-  if (search_selections.size() != searches.size()) {
-    search_selections.resize(searches.size(), false);
-  }
-
-  // Step 1: Select meta-algorithm
-  ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Step 1: Select Metaheuristic");
   if (ImGui::BeginCombo(
-        "Metaheuristic",
-        selected_meta_algorithm.empty() ? "Select Algorithm" : selected_meta_algorithm.c_str()
+        "Algorithm Type",
+        selected_algorithm.empty() ? "Select Algorithm" : selected_algorithm.c_str()
       )) {
     for (const auto& algo : meta_algorithms) {
-      bool is_selected = (selected_meta_algorithm == algo);
+      bool is_selected = (selected_algorithm == algo);
       if (ImGui::Selectable(algo.c_str(), is_selected)) {
-        selected_meta_algorithm = algo;
-
-        // Reset other selections when changing meta-algorithm
-        if (algo == "MultiStart") {
-          iterations_or_starts = 10;  // Default for MultiStart
-        } else if (algo == "GVNS") {
-          iterations_or_starts = 50;  // Default for GVNS
-        }
+        problem_manager_->setSelectedAlgorithm(algo);
       }
-
       if (is_selected) {
         ImGui::SetItemDefaultFocus();
-      }
-
-      // Display description on hover
-      if (ImGui::IsItemHovered()) {
-        ImGui::BeginTooltip();
-        if (algo == "GVNS") {
-          ImGui::TextUnformatted("General Variable Neighborhood Search metaheuristic");
-        } else if (algo == "MultiStart") {
-          ImGui::TextUnformatted("Multi-Start metaheuristic with local search");
-        } else if (algo == "VRPTSolver") {
-          ImGui::TextUnformatted("Complete VRPT solver (Phases 1 and 2)");
-        }
-        ImGui::EndTooltip();
       }
     }
     ImGui::EndCombo();
   }
 
-  // Only continue if a meta-algorithm is selected
-  if (!selected_meta_algorithm.empty()) {
+  // Step 2: Configure algorithm parameters
+  if (!selected_algorithm.empty()) {
     ImGui::Separator();
-
-    // Step 2: Parameters for the selected meta-algorithm
     ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Step 2: Configure Parameters");
 
-    if (selected_meta_algorithm == "GVNS") {
-      ImGui::SliderInt("Max Iterations", &iterations_or_starts, 1, 100);
-    } else if (selected_meta_algorithm == "MultiStart") {
-      ImGui::SliderInt("Number of Starts", &iterations_or_starts, 1, 50);
-    }
-
-    // Step 3: Select generator
-    if (selected_meta_algorithm != "VRPTSolver") {  // VRPTSolver doesn't need a generator selection
-      ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Step 3: Select Solution Generator");
-
-      if (ImGui::BeginCombo(
-            "Generator",
-            selected_generator.empty() ? "Select Generator" : selected_generator.c_str()
-          )) {
-        for (const auto& gen : generators) {
-          bool is_selected = (selected_generator == gen);
-          if (ImGui::Selectable(gen.c_str(), is_selected)) {
-            selected_generator = gen;
-          }
-
-          if (is_selected) {
-            ImGui::SetItemDefaultFocus();
-          }
-
-          // Display description on hover
-          if (ImGui::IsItemHovered()) {
-            ImGui::BeginTooltip();
-            ImGui::TextUnformatted(("Generator for initial solutions: " + gen).c_str());
-            ImGui::EndTooltip();
-          }
-        }
-        ImGui::EndCombo();
-      }
-    }
-
-    // Step 4: Select search algorithms
-    if (selected_meta_algorithm != "VRPTSolver") {
-      ImGui::TextColored(
-        ImVec4(0.6f, 0.8f, 1.0f, 1.0f),
-        selected_meta_algorithm == "GVNS" ? "Step 4: Select Neighborhood Structures"
-                                          : "Step 4: Select Local Search"
-      );
-
-      ImGui::BeginChild("SearchesChild", ImVec2(0, 120), true);
-
-      for (size_t i = 0; i < searches.size(); i++) {
-        if (selected_meta_algorithm == "GVNS") {
-          // For GVNS, allow multiple selections
-          bool is_checked = search_selections[i];
-          if (ImGui::Checkbox(searches[i].c_str(), &is_checked)) {
-            search_selections[i] = is_checked;
-          }
-        } else if (selected_meta_algorithm == "MultiStart") {
-          // For MultiStart, only allow one selection
-          bool is_selected = (selected_searches.size() == 1 && selected_searches[0] == searches[i]);
-          if (ImGui::RadioButton(searches[i].c_str(), is_selected)) {
-            selected_searches.clear();
-            selected_searches.push_back(searches[i]);
-          }
-        }
-
-        // Display description on hover
-        if (ImGui::IsItemHovered()) {
-          ImGui::BeginTooltip();
-          ImGui::TextUnformatted(("Local search method: " + searches[i]).c_str());
-          ImGui::EndTooltip();
-        }
-      }
-
-      ImGui::EndChild();
-    } else if (selected_meta_algorithm == "VRPTSolver") {
-      // VRPTSolver uses defaults, no need for additional UI elements
-      ImGui::TextWrapped("VRPTSolver uses MultiStart for Phase 1 and GreedyTVScheduler for Phase 2"
-      );
-    }
+    // Render algorithm-specific configuration UI
+    problem_manager_->renderAlgorithmConfigurationUI();
 
     ImGui::Separator();
 
-    // Construct algorithm name based on selections
-    std::string algorithm_name = "";
-    bool can_run = false;
-
-    if (selected_meta_algorithm == "GVNS") {
-      // GVNS requires a generator and at least one search
-      std::vector<std::string> selected_search_names;
-      for (size_t i = 0; i < searches.size(); i++) {
-        if (search_selections[i]) {
-          selected_search_names.push_back(searches[i]);
-        }
-      }
-
-      if (!selected_generator.empty() && !selected_search_names.empty()) {
-        algorithm_name = "GVNS";
-        selected_searches = selected_search_names;  // Store for later use
-        can_run = true;
-      }
-    } else if (selected_meta_algorithm == "MultiStart") {
-      // MultiStart requires a generator and exactly one search
-      if (!selected_generator.empty() && selected_searches.size() == 1) {
-        algorithm_name = "MultiStart";
-        can_run = true;
-      }
-    } else if (selected_meta_algorithm == "VRPTSolver") {
-      // VRPTSolver doesn't need additional selections
-      algorithm_name = "VRPTSolver";
-      can_run = true;
-    }
-
-    // Display the constructed algorithm and run button
-    if (can_run) {
-      problem_manager_->setSelectedAlgorithm(algorithm_name);
-      ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "Algorithm Configuration Valid");
-    }
-
-    // Disable the button if configuration is invalid
-    if (!can_run) {
-      ImGui::BeginDisabled();
-    }
-
-    // Single button implementation
+    // Run button
     if (ImGui::Button("Run Algorithm", ImVec2(-FLT_MIN, 0))) {
-      if (can_run && problem_manager_->runAlgorithm()) {
-        // If algorithm successfully ran, update UI
+      if (problem_manager_->runAlgorithm()) {
+        // Algorithm ran successfully
       } else {
         show_no_algorithm_warning_ = true;
       }
-    }
-
-    if (!can_run) {
-      ImGui::EndDisabled();
     }
   }
 

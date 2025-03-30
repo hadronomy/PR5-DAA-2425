@@ -71,6 +71,8 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     return "O(n × m)";  // n = number of starts, m = complexity of local search
   }
 
+  void renderConfigurationUI() override;
+
  private:
   int num_starts_;
   std::string generator_name_;

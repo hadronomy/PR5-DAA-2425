@@ -10,6 +10,8 @@
 #include "problem/vrpt_problem.h"
 #include "raylib.h"
 
+#include "algorithm_registry.h"
+
 namespace daa {
 namespace visualization {
 
@@ -44,7 +46,14 @@ class ProblemManager {
   const std::vector<std::string>& getAvailableProblemFiles() const;
 
   // Set selected algorithm
-  void setSelectedAlgorithm(const std::string& name);
+  void setSelectedAlgorithm(const std::string& name) {
+    // Only reset if the algorithm type actually changed
+    if (selected_algorithm_ != name) {
+      selected_algorithm_ = name;
+      // Reset the current algorithm to force recreation with new type
+      current_algorithm_.reset();
+    }
+  }
 
   // Get selected algorithm
   const std::string& getSelectedAlgorithm() const { return selected_algorithm_; }
@@ -75,6 +84,12 @@ class ProblemManager {
   void setIterationsOrStarts(int value) { iterations_or_starts_ = value; }
   int getIterationsOrStarts() const { return iterations_or_starts_; }
 
+  // Check if an algorithm is selected
+  bool isAlgorithmSelected() const;
+
+  // Render algorithm configuration UI
+  void renderAlgorithmConfigurationUI();
+
  private:
   // Map of filename to problem instance
   std::unordered_map<std::string, std::unique_ptr<VRPTProblem>> problems_;
@@ -98,6 +113,12 @@ class ProblemManager {
   std::string selected_generator_;
   std::vector<std::string> selected_searches_;
   int iterations_or_starts_ = 10;
+
+  // Algorithm management
+  std::string current_algorithm_type_;
+  std::unique_ptr<daa::TypedAlgorithm<VRPTProblem, daa::algorithm::VRPTSolution>>
+    current_algorithm_;
+  bool has_solution_ = false;
 };
 
 }  // namespace visualization

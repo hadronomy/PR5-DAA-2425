@@ -50,6 +50,9 @@ class Algorithm {
   // For tracking recursion depth in algorithms
   virtual int get_max_recursion_depth() const { return 0; }
 
+  // UI configuration rendering method
+  virtual void renderConfigurationUI() {}
+
   // Default time limit in milliseconds (5 minutes)
   static inline int DEFAULT_TIME_LIMIT_MS = 5000 * 60;
 };
@@ -102,9 +105,10 @@ class AlgorithmRegistry {
     return instance;
   }
 
-  // Register an algorithm creator function - enhanced with concepts
+  // Register an algorithm creator function - with default-constructibility constraint
   template <typename T>
-  requires std::derived_from<T, Algorithm> static bool registerAlgorithm(std::string_view name) {
+  requires std::derived_from<T, Algorithm>&& std::is_default_constructible_v<T> static bool
+    registerAlgorithm(std::string_view name) {
     instance().algorithms_[std::string(name)] = []() {
       return std::make_unique<T>();
     };
@@ -268,9 +272,13 @@ class TypedAlgorithmFactory {
   }
 };
 
-// Enhanced macro for algorithm registration
+// Enhanced macro for algorithm registration with default-constructibility check
 #define REGISTER_ALGORITHM(className, name)                                    \
   namespace {                                                                  \
+  static_assert(                                                               \
+    std::is_default_constructible_v<className>,                                \
+    #className " must be default-constructible"                                \
+  );                                                                           \
   static const daa::AlgorithmRegistrar<className> className##_registrar(name); \
   }
 

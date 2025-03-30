@@ -128,7 +128,7 @@ class CVRoute {
   }
 
   // Validate route
-  [[nodiscard]] bool isValid(const VRPTProblem& problem) const {
+  [[nodiscard]] bool isValid(const VRPTProblem& _) const {
     // Check if route is empty
     if (location_ids_.empty()) {
       return true;  // Empty route is considered valid

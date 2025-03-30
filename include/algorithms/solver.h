@@ -63,6 +63,9 @@ class VRPTSolver : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     return "O(CV + TV)";  // Complexity depends on the underlying algorithms
   }
 
+  // UI configuration rendering
+  void renderConfigurationUI() override;
+
  private:
   std::string cv_algorithm_;
   std::string tv_algorithm_;

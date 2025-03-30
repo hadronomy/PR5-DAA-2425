@@ -6,6 +6,7 @@
 #include <limits>
 
 #include "algorithm_registry.h"
+#include "imgui.h"
 
 namespace fs = std::filesystem;
 
@@ -173,50 +174,62 @@ const std::vector<std::string>& ProblemManager::getAvailableProblemFiles() const
   return available_problems_;
 }
 
-void ProblemManager::setSelectedAlgorithm(const std::string& name) {
-  selected_algorithm_ = name;
-}
-
 bool ProblemManager::hasValidAlgorithmSelection() const {
   return !selected_algorithm_.empty() && AlgorithmRegistry::exists(selected_algorithm_);
 }
 
+bool ProblemManager::isAlgorithmSelected() const {
+  return !selected_algorithm_.empty() && AlgorithmRegistry::exists(selected_algorithm_);
+}
+
 bool ProblemManager::runAlgorithm() {
-  if (!isProblemLoaded() || !hasValidAlgorithmSelection()) {
+  if (!isAlgorithmSelected() || !isProblemLoaded()) {
     return false;
   }
 
   try {
+    // Get the current problem
     VRPTProblem* problem = getCurrentProblem();
     if (!problem) {
       return false;
     }
 
-    // Create and run the algorithm
-    auto algorithm =
-      AlgorithmRegistry::createTyped<VRPTProblem, algorithm::VRPTSolution>(selected_algorithm_);
-    if (!algorithm) {
-      return false;
+    // If no algorithm instance exists or algorithm type changed, create a new one
+    if (!current_algorithm_ || current_algorithm_type_ != selected_algorithm_) {
+      current_algorithm_ =
+        AlgorithmRegistry::createTyped<VRPTProblem, algorithm::VRPTSolution>(selected_algorithm_);
+      current_algorithm_type_ = selected_algorithm_;
     }
 
-    // Clear any existing solution
-    solution_.reset();
-
-    // Run the algorithm with a timeout
-    auto solution = algorithm->solveWithTimeLimit(*problem);
-
-    // Store the solution
-    solution_ = std::make_unique<algorithm::VRPTSolution>(solution);
-
-    std::cout << "Algorithm " << selected_algorithm_ << " executed successfully" << std::endl;
-    std::cout << "Solution uses " << solution_->getCVCount() << " collection vehicles and "
-              << solution_->getTVCount() << " transportation vehicles" << std::endl;
-
+    // Use the configured algorithm to solve the problem
+    solution_ = std::make_unique<algorithm::VRPTSolution>(current_algorithm_->solve(*problem));
+    has_solution_ = true;
     return true;
   } catch (const std::exception& e) {
     std::cerr << "Error running algorithm: " << e.what() << std::endl;
     return false;
   }
+}
+
+void ProblemManager::renderAlgorithmConfigurationUI() {
+  if (!current_algorithm_) {
+    if (!isAlgorithmSelected()) {
+      return;
+    }
+
+    // Create the algorithm instance if it doesn't exist
+    try {
+      current_algorithm_ =
+        AlgorithmRegistry::createTyped<VRPTProblem, algorithm::VRPTSolution>(selected_algorithm_);
+      current_algorithm_type_ = selected_algorithm_;
+    } catch (const std::exception& e) {
+      ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Error: %s", e.what());
+      return;
+    }
+  }
+
+  // Render the algorithm's configuration UI
+  current_algorithm_->renderConfigurationUI();
 }
 
 }  // namespace visualization

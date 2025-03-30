@@ -50,6 +50,7 @@ namespace daa {
 #define NOPROFILER        // Profiler interface.
 #define NODEFERWINDOWPOS  // DeferWindowPos routines
 #define NOMCX             // Modem Configuration Extensions
+#define MMNOSOUND
 
 // Type required before windows.h inclusion
 typedef struct tagMSG* LPMSG;
