@@ -29,46 +29,52 @@ class GreedyCVGenerator : public ::meta::SolutionGenerator<VRPTSolution, VRPTPro
   VRPTSolution generateSolution(const VRPTProblem& problem) override {
     VRPTSolution solution;
 
-    // Get all collection zones
+    // Get all collection zones (line 3: while C ≠ ∅)
     std::vector<Location> zones = problem.getZones();
     std::unordered_set<std::string> unassigned_zones;
     for (const auto& zone : zones) {
       unassigned_zones.insert(zone.id());
     }
 
-    // Vehicle parameters
-    const Capacity cv_capacity = problem.getCVCapacity();
-    const Duration cv_max_duration = problem.getCVMaxDuration();
-
-    // Depot information
-    const auto& depot = problem.getDepot();
-
     // Generate routes until all zones are assigned
     int route_count = 1;
     while (!unassigned_zones.empty()) {
-      // Create a new route
+      // Create a new route (lines 4-6)
       std::string vehicle_id = "CV" + std::to_string(route_count++);
-      CVRoute route(vehicle_id, cv_capacity, cv_max_duration);
+      CVRoute route(vehicle_id, problem.getCVCapacity(), problem.getCVMaxDuration());
 
-      // Set current location to depot
-      std::string current_location_id = depot.id();
+      // Start from depot (implicit in line 4: Rk ← {depot})
+      std::string current_location_id = problem.getDepot().id();
 
-      // Keep adding zones until no more can be added
-      bool zone_added;
-      do {
-        zone_added = false;
-
-        // Find closest unassigned zone
+      // Main route building loop (line 7: while true)
+      while (true) {
+        // Find closest unassigned zone (line 8)
         std::optional<std::string> closest_zone;
         double min_distance = std::numeric_limits<double>::max();
 
         for (const auto& zone_id : unassigned_zones) {
-          // Check if this zone can be added to the route
-          if (route.canVisit(zone_id, problem)) {
-            // Calculate distance from current location
-            double distance = problem.getDistance(current_location_id, zone_id).value();
+          double distance = problem.getDistance(current_location_id, zone_id).value();
+          if (distance < min_distance) {
+            // Check feasibility (lines 9-10)
+            // Time needed to visit zone, a SWTS, and return to depot
+            const auto& zone = problem.getLocation(zone_id);
+            auto nearest_swts = problem.findNearest(zone, LocationType::SWTS);
 
-            if (distance < min_distance) {
+            if (!nearest_swts)
+              continue;
+
+            Duration travel_time_to_zone = problem.getTravelTime(current_location_id, zone_id);
+            Duration service_time = zone.serviceTime();
+            Duration travel_time_to_swts = problem.getTravelTime(zone_id, nearest_swts->id());
+            Duration travel_time_to_depot =
+              problem.getTravelTime(nearest_swts->id(), problem.getDepot().id());
+
+            Duration total_time =
+              travel_time_to_zone + service_time + travel_time_to_swts + travel_time_to_depot;
+
+            // Check capacity and time constraints
+            if (zone.wasteAmount() <= route.residualCapacity() &&
+                total_time <= route.residualTime()) {
               min_distance = distance;
               closest_zone = zone_id;
             }
@@ -76,45 +82,41 @@ class GreedyCVGenerator : public ::meta::SolutionGenerator<VRPTSolution, VRPTPro
         }
 
         if (closest_zone) {
-          // Add the closest zone to the route
+          // Add zone to route (lines 11-14)
           route.addLocation(*closest_zone, problem);
           current_location_id = *closest_zone;
           unassigned_zones.erase(*closest_zone);
-          zone_added = true;
         } else {
-          // No more zones can be added directly, check if we need to visit SWTS
-          if (route.currentLoad().value() > 0) {
-            // Find closest SWTS
-            const auto& current_location = problem.getLocation(current_location_id);
-            auto nearest_swts = problem.findNearest(current_location, LocationType::SWTS);
+          // Cannot add a zone directly (lines 15-16)
+          // Check if going to SWTS is feasible time-wise
+          const auto& current_loc = problem.getLocation(current_location_id);
+          auto nearest_swts = problem.findNearest(current_loc, LocationType::SWTS);
 
-            if (nearest_swts && route.canVisit(nearest_swts->id(), problem)) {
-              // Visit SWTS to unload
-              route.addLocation(nearest_swts->id(), problem);
-              current_location_id = nearest_swts->id();
-
-              // Try adding zones again
-              continue;
-            }
+          if (nearest_swts && route.canVisit(nearest_swts->id(), problem)) {
+            // Go to SWTS and reset capacity (lines 17-20)
+            route.addLocation(nearest_swts->id(), problem);
+            current_location_id = nearest_swts->id();
+          } else {
+            // Cannot continue this route (line 22)
+            break;
           }
-
-          // Cannot add more zones or visit SWTS
-          zone_added = false;
         }
-      } while (zone_added);
+      }
 
-      // Finalize route - ensure it ends at a SWTS if it has any load
-      if (!route.isEmpty() && route.currentLoad().value() > 0) {
-        // Find nearest SWTS to last location
-        const auto& last_location = problem.getLocation(current_location_id);
-        auto nearest_swts = problem.findNearest(last_location, LocationType::SWTS);
-
-        if (nearest_swts) {
+      // Finalize the route (lines 26-31)
+      const auto& current_loc = problem.getLocation(current_location_id);
+      if (current_loc.type() != LocationType::SWTS) {
+        // If not at SWTS, find closest SWTS and go there
+        auto nearest_swts = problem.findNearest(current_loc, LocationType::SWTS);
+        if (nearest_swts && route.canVisit(nearest_swts->id(), problem)) {
           route.addLocation(nearest_swts->id(), problem);
         }
       }
 
-      // Add the route to the solution if it's not empty
+      // Return to depot
+      route.addLocation(problem.getDepot().id(), problem);
+
+      // Add route to solution if it's not empty (line 32)
       if (!route.isEmpty()) {
         solution.addCVRoute(std::move(route));
       }

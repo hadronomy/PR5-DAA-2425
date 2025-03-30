@@ -20,7 +20,7 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
  public:
   explicit MultiStart(
     int num_starts = 10,
-    const std::string& generator_name = "GRASPCVGenerator",
+    const std::string& generator_name = "GreedyCVGenerator",
     const std::string& search_name = "TaskReinsertionSearch"
   )
       : num_starts_(num_starts), generator_name_(generator_name), search_name_(search_name) {}
