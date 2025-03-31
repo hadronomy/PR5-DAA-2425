@@ -1,4 +1,4 @@
-L1 960
+L1 480
 L2 480
 num_vehicles 12
 num_zones 20
