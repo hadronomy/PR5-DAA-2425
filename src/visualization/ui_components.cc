@@ -965,17 +965,15 @@ void UIComponents::RenderSolutionStatsWindow() {
     if (cv_routes.empty()) {
       ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No CV routes in solution");
     } else {
-      // Table for routes overview
+      // Table for routes overview - changed from 5 columns to 3 columns
       if (ImGui::BeginTable(
             "CVRoutesTable",
-            5,
+            3,
             ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY
           )) {
         ImGui::TableSetupColumn("Route #");
         ImGui::TableSetupColumn("Locations");
         ImGui::TableSetupColumn("Duration");
-        ImGui::TableSetupColumn("Load");
-        ImGui::TableSetupColumn("Fill %");
         ImGui::TableHeadersRow();
 
         for (size_t i = 0; i < cv_routes.size(); i++) {
@@ -1006,26 +1004,8 @@ void UIComponents::RenderSolutionStatsWindow() {
           ImGui::TableSetColumnIndex(2);
           ImGui::Text("%.1f min", route.totalDuration().value(units::TimeUnit::Minutes));
 
-          ImGui::TableSetColumnIndex(3);
-          ImGui::Text("%.1f", route.currentLoad().value());
-
-          ImGui::TableSetColumnIndex(4);
-          float fill_percent =
-            (route.currentLoad().value() / problem->getCVCapacity().value()) * 100.0f;
-
-          // Color code based on fill percentage
-          ImVec4 fill_color;
-          if (fill_percent < 50.0f)
-            fill_color = ImVec4(0.8f, 0.3f, 0.3f, 1.0f);  // Red for low utilization
-          else if (fill_percent < 75.0f)
-            fill_color = ImVec4(0.8f, 0.8f, 0.3f, 1.0f);  // Yellow for medium
-          else
-            fill_color = ImVec4(0.3f, 0.8f, 0.3f, 1.0f);  // Green for good utilization
-
-          ImGui::TextColored(fill_color, "%.1f%%", fill_percent);
-
           // Detailed route information on hover
-          if (ImGui::IsItemHovered()) {
+          if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
             ImGui::BeginTooltip();
             ImGui::Text("Vehicle ID: %s", route.vehicleId().c_str());
             ImGui::Text(
@@ -1034,10 +1014,12 @@ void UIComponents::RenderSolutionStatsWindow() {
               problem->getCVMaxDuration().value(units::TimeUnit::Minutes),
               (route.totalDuration().value() / problem->getCVMaxDuration().value()) * 100.0f
             );
+
             ImGui::Text(
-              "Load: %.2f / %.2f units",
+              "Load: %.2f / %.2f units (%.1f%%)",
               route.currentLoad().value(),
-              problem->getCVCapacity().value()
+              problem->getCVCapacity().value(),
+              (route.currentLoad().value() / problem->getCVCapacity().value()) * 100.0f
             );
 
             // List of all locations
@@ -1115,20 +1097,20 @@ void UIComponents::RenderSolutionStatsWindow() {
     }
   }
 
-  // Transportation Vehicle Routes details
+  // Transportation Vehicle Routes details - also update to remove Pickups column
   if (ImGui::CollapsingHeader("Transportation Vehicle Routes")) {
     if (tv_routes.empty()) {
       ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No TV routes in solution");
     } else {
       if (ImGui::BeginTable(
             "TVRoutesTable",
-            4,
+            3,  // Changed from 4 to 3 columns (removing Pickups column)
             ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY
           )) {
         ImGui::TableSetupColumn("Route #");
         ImGui::TableSetupColumn("Locations");
         ImGui::TableSetupColumn("Duration");
-        ImGui::TableSetupColumn("Pickups");
+        // Removed "Pickups" column
         ImGui::TableHeadersRow();
 
         for (size_t i = 0; i < tv_routes.size(); i++) {
@@ -1159,11 +1141,8 @@ void UIComponents::RenderSolutionStatsWindow() {
           ImGui::TableSetColumnIndex(2);
           ImGui::Text("%.1f min", route.currentTime().value(units::TimeUnit::Minutes));
 
-          ImGui::TableSetColumnIndex(3);
-          ImGui::Text("%zu", route.pickups().size());
-
-          // Detailed route information on hover
-          if (ImGui::IsItemHovered()) {
+          // Detailed route information on hover - keep tooltip with pickups info
+          if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
             ImGui::BeginTooltip();
             ImGui::Text("Vehicle ID: %s", route.vehicleId().c_str());
             ImGui::Text(
@@ -1172,6 +1151,9 @@ void UIComponents::RenderSolutionStatsWindow() {
               problem->getTVMaxDuration().value(units::TimeUnit::Minutes),
               (route.currentTime().value() / problem->getTVMaxDuration().value()) * 100.0f
             );
+
+            // Keep pickups information in tooltip
+            ImGui::Text("Pickups: %zu", route.pickups().size());
 
             // List of all locations
             if (!route.locationIds().empty()) {
