@@ -279,7 +279,7 @@ void UIComponents::RenderProblemSelector() {
     if (ImGui::BeginListBox(
           "##Problems", ImVec2(-FLT_MIN, 10 * ImGui::GetTextLineHeightWithSpacing())
         )) {
-      for (size_t i = 0; i < available_problems.size(); i++) {
+      for (size_t i = 0; i < available_problems.size(); ++i) {
         const std::string& problem_path = available_problems[i];
         std::string filename = std::filesystem::path(problem_path).filename().string();
 
@@ -289,21 +289,28 @@ void UIComponents::RenderProblemSelector() {
         // Check if this is an additional file (not in the main directory)
         bool is_additional = problem_manager_->getAdditionalProblemFiles().count(problem_path) > 0;
 
+        // Create a unique ID by combining the index and full path
+        std::string unique_id = "##" + std::to_string(i) + "_" + problem_path;
+
         // Use colored text for additional files
         if (is_additional) {
           ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 220, 150, 255));  // Light orange
         }
 
-        if (ImGui::Selectable(filename.c_str(), is_selected)) {
+        // Use the unique ID for the selectable but display only the filename
+        if (ImGui::Selectable((filename + unique_id).c_str(), is_selected)) {
           problem_manager_->loadProblem(problem_path);
         }
 
         if (is_additional) {
           ImGui::PopStyleColor();
 
+          // Use a unique ID for the context menu
+          std::string context_menu_id = "context_menu_" + std::to_string(i) + "_" + problem_path;
+          
           // Add context menu for additional files to allow removal
-          if (ImGui::BeginPopupContextItem()) {
-            if (ImGui::MenuItem("Remove from list")) {
+          if (ImGui::BeginPopupContextItem(context_menu_id.c_str())) {
+            if (ImGui::MenuItem(("Remove from list##" + std::to_string(i)).c_str())) {
               problem_manager_->removeProblemFile(problem_path);
             }
             ImGui::EndPopup();
