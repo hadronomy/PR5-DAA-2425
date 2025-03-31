@@ -4,7 +4,6 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
-#include <unordered_set>
 
 #include "algorithm_registry.h"
 #include "imgui.h"
