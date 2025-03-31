@@ -16,14 +16,14 @@ namespace daa {
 namespace visualization {
 
 UIComponents::UIComponents(ObjectManager* object_manager)
-    : object_manager_(object_manager),
+    : canvas_(nullptr),
+      object_manager_(object_manager),
       problem_manager_(nullptr),
       show_problem_selector_(true),
       show_problem_inspector_(true),
       show_algorithm_selector_(true),
       show_no_algorithm_warning_(false),
-      show_solution_stats_(true),
-      canvas_(nullptr) {}
+      show_solution_stats_(true) {}
 
 UIComponents::~UIComponents() {}
 
@@ -492,7 +492,6 @@ void UIComponents::FocusOnSelectedRoute() {
   if (!selected_route_ || !canvas_ || !problem_manager_ || !problem_manager_->hasSolution())
     return;
 
-  const auto* solution = problem_manager_->getSolution();
   Rectangle bounds{0, 0, 0, 0};
   bool has_bounds = false;
 
@@ -898,7 +897,6 @@ void UIComponents::RenderSolutionStatsWindow() {
 
     // Calculate some overall statistics
     Duration total_cv_time(0.0);
-    float cv_route_fill_pct = 0.0f;
     int zones_visited = 0;
     float total_zones = problem->getNumZones();
 
@@ -906,8 +904,6 @@ void UIComponents::RenderSolutionStatsWindow() {
     for (const auto& route : cv_routes) {
       if (!route.isEmpty()) {
         total_cv_time = total_cv_time + route.totalDuration();
-        cv_route_fill_pct +=
-          (route.currentLoad().value() / problem->getCVCapacity().value()) * 100.0f;
 
         // Count only collection zones (not SWTS or other locations)
         for (const auto& loc_id : route.locationIds()) {
@@ -922,16 +918,6 @@ void UIComponents::RenderSolutionStatsWindow() {
         }
       }
     }
-
-    if (!cv_routes.empty()) {
-      cv_route_fill_pct /= cv_routes.size();
-    }
-
-    ImGui::TableNextRow();
-    ImGui::TableNextColumn();
-    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "Avg. Vehicle Fill Rate:");
-    ImGui::TableNextColumn();
-    ImGui::Text("%.1f%%", cv_route_fill_pct);
 
     ImGui::TableNextRow();
     ImGui::TableNextColumn();
