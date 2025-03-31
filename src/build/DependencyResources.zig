@@ -110,13 +110,20 @@ pub fn init(
     exe.linkLibrary(fmt);
     exe.linkLibrary(cimgui_dep.artifact("cimgui"));
     exe.linkLibrary(raylib_dep.artifact("raylib"));
+    exe.addIncludePath(raylib_dep.path("src"));
     // TODO: Use a dependency for this
+
     exe.addCSourceFile(.{
         .file = b.path("deps/lib/common/rlImGui.cpp"),
         .flags = cppflags,
     });
     exe.addIncludePath(b.path("deps/lib/common"));
-    exe.addIncludePath(raylib_dep.path("src"));
+
+    exe.addIncludePath(b.path("deps/lib/tinyfiledialogs"));
+    exe.addCSourceFile(.{
+        .file = b.path("deps/lib/tinyfiledialogs/tinyfiledialogs.cc"),
+        .flags = cppflags,
+    });
 
     b.installDirectory(.{
         .source_dir = b.path("resources"),

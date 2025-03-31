@@ -110,6 +110,8 @@ fn linkGlfw(b: *std.Build, exe: *std.Build.Step.Compile, target: std.Build.Resol
         exe.linkSystemLibrary("gdi32");
         exe.linkSystemLibrary("shell32");
         exe.linkSystemLibrary("opengl32");
+        exe.linkSystemLibrary("comdlg32");
+        exe.linkSystemLibrary("ole32");
     } else {
         exe.linkSystemLibrary("gl");
         exe.linkSystemLibrary("glfw");

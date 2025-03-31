@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <unordered_set>
 
 #include "algorithm_registry.h"
 #include "imgui.h"
@@ -14,6 +15,40 @@ namespace daa {
 namespace visualization {
 
 ProblemManager::ProblemManager() : current_problem_filename_("") {}
+
+void ProblemManager::addProblemFile(const std::string& filepath) {
+  // Only add if it's a .txt file
+  if (fs::path(filepath).extension() == ".txt") {
+    additional_problem_files_.insert(filepath);
+    // If no problems have been loaded yet, initiate a scan to include this file
+    if (available_problems_.empty()) {
+      scanDirectory("examples/");
+    } else {
+      // Just add the file to available problems if it's not already there
+      if (std::find(available_problems_.begin(), available_problems_.end(), filepath) ==
+          available_problems_.end()) {
+        available_problems_.push_back(filepath);
+        std::sort(available_problems_.begin(), available_problems_.end());
+      }
+    }
+  }
+}
+
+void ProblemManager::removeProblemFile(const std::string& filepath) {
+  additional_problem_files_.erase(filepath);
+  // Remove from available problems if present
+  auto it = std::find(available_problems_.begin(), available_problems_.end(), filepath);
+  if (it != available_problems_.end()) {
+    available_problems_.erase(it);
+  }
+
+  // If this was the currently loaded problem, clear it
+  if (current_problem_filename_ == filepath) {
+    problems_.erase(filepath);
+    current_problem_filename_ = "";
+    clearSolution();
+  }
+}
 
 bool ProblemManager::scanDirectory(const std::string& dir_path) {
   // Remember the currently selected problem if any
@@ -42,6 +77,14 @@ bool ProblemManager::scanDirectory(const std::string& dir_path) {
         if (entry.path().extension() == ".txt") {
           available_problems_.push_back(entry.path().string());
         }
+      }
+    }
+
+    // Add additional problem files that have been manually added
+    for (const auto& filepath : additional_problem_files_) {
+      if (std::find(available_problems_.begin(), available_problems_.end(), filepath) ==
+          available_problems_.end()) {
+        available_problems_.push_back(filepath);
       }
     }
 

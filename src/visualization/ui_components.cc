@@ -10,7 +10,7 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 
-#include "algorithms.h"
+#include "tinyfiledialogs.h"
 
 namespace daa {
 namespace visualization {
@@ -37,6 +37,20 @@ void UIComponents::ScanProblemsDirectory(const std::string& dir_path) {
   if (problem_manager_) {
     problem_manager_->scanDirectory(dir_path);
   }
+}
+
+std::string
+  UIComponents::OpenFileDialog(const char* title, const char* const* filters, int num_filters) {
+  const char* path = tinyfd_openFileDialog(
+    title,        // title
+    "",           // default path
+    num_filters,  // number of filter patterns
+    filters,      // filter patterns
+    NULL,         // single filter description
+    0             // allow multiple selections (0 = no)
+  );
+
+  return path ? std::string(path) : std::string();
 }
 
 void UIComponents::RenderDiagonalPattern(
@@ -231,6 +245,20 @@ void UIComponents::RenderProblemSelector() {
   ImGui::Begin("Problem Selector", &show_problem_selector_);
 
   ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Available Problems");
+
+  // Add button for refreshing
+  ImGui::SameLine(ImGui::GetWindowWidth() - 140);  // Position for two buttons
+  if (ImGui::Button("Add File")) {
+    // Use native OS file dialog instead of custom popup
+    const char* filters[] = {"*.txt"};
+    std::string selected_file = OpenFileDialog("Select Problem File", filters, 1);
+
+    // If a file was selected, add it to the problem manager
+    if (!selected_file.empty()) {
+      problem_manager_->addProblemFile(selected_file);
+    }
+  }
+
   ImGui::SameLine(ImGui::GetWindowWidth() - 70);
   if (ImGui::Button("Refresh")) {
     ScanProblemsDirectory();
@@ -258,13 +286,37 @@ void UIComponents::RenderProblemSelector() {
         bool is_selected = problem_manager_->isProblemLoaded() &&
                            problem_path == problem_manager_->getCurrentProblemFilename();
 
+        // Check if this is an additional file (not in the main directory)
+        bool is_additional = problem_manager_->getAdditionalProblemFiles().count(problem_path) > 0;
+
+        // Use colored text for additional files
+        if (is_additional) {
+          ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 220, 150, 255));  // Light orange
+        }
+
         if (ImGui::Selectable(filename.c_str(), is_selected)) {
           problem_manager_->loadProblem(problem_path);
+        }
+
+        if (is_additional) {
+          ImGui::PopStyleColor();
+
+          // Add context menu for additional files to allow removal
+          if (ImGui::BeginPopupContextItem()) {
+            if (ImGui::MenuItem("Remove from list")) {
+              problem_manager_->removeProblemFile(problem_path);
+            }
+            ImGui::EndPopup();
+          }
         }
 
         if (ImGui::IsItemHovered()) {
           ImGui::BeginTooltip();
           ImGui::Text("%s", problem_path.c_str());
+          if (is_additional) {
+            ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.3f, 1.0f), "(Added manually)");
+            ImGui::Text("Right-click to remove");
+          }
           ImGui::EndTooltip();
         }
       }

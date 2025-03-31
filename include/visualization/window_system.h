@@ -18,7 +18,6 @@ class WindowSystem {
   void EndFrame();
   bool ShouldClose() const;
   void FocusWindowByName(std::string_view window_name, bool force_focus = false);
-  void CheckMouseButtonsForCanvas();
 
  private:
   void SetupDocking();

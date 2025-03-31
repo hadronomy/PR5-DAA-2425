@@ -245,6 +245,16 @@ void Canvas::UpdateRenderTexture() {
   BeginTextureMode(render_texture_);
   ClearBackground(CLITERAL(Color){40, 40, 40, 255});
 
+  // Focus when interacting
+  float wheel = GetMouseWheelMove();
+  bool is_hovered = ImGui::IsWindowHovered();
+  bool is_interacting = IsMouseButtonPressed(MOUSE_LEFT_BUTTON) ||
+                        IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) ||
+                        IsMouseButtonPressed(MOUSE_RIGHT_BUTTON);
+  if ((wheel != 0 || is_interacting) && is_hovered) {
+    ImGui::SetWindowFocus("Canvas");
+  }
+
   // Only use the shader if it's ready
   if (shader_ready_) {
     BeginShaderMode(grid_shader_);

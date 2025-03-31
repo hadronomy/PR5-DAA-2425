@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -44,6 +45,17 @@ class ProblemManager {
 
   // Get list of available problems
   const std::vector<std::string>& getAvailableProblemFiles() const;
+
+  // Add a problem file outside the main directory
+  void addProblemFile(const std::string& filepath);
+
+  // Remove a problem file from additional files
+  void removeProblemFile(const std::string& filepath);
+
+  // Get the list of additional problem files
+  const std::set<std::string>& getAdditionalProblemFiles() const {
+    return additional_problem_files_;
+  }
 
   // Set selected algorithm
   void setSelectedAlgorithm(const std::string& name) {
@@ -99,6 +111,9 @@ class ProblemManager {
 
   // List of available problem files
   std::vector<std::string> available_problems_;
+
+  // Additional problem files to include beyond the scanned directory
+  std::set<std::string> additional_problem_files_;
 
   // Selected algorithm
   std::string selected_algorithm_;

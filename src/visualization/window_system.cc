@@ -74,16 +74,6 @@ void WindowSystem::BeginFrame() {
     ConfigureImGuiStyle();  // Apply theme again on first real frame
   }
 
-  // Check for mouse wheel activity and focus canvas if needed
-  float wheel = GetMouseWheelMove();
-  if (wheel != 0) {
-    // Try to find and focus the Canvas window automatically when scrolling
-    FocusWindowByName("Canvas", false);  // Use hover check for wheel activity
-  }
-
-  // Check for mouse buttons and focus canvas if needed
-  CheckMouseButtonsForCanvas();
-
   // Create dockspace every frame
   CreateDockspace();
 
@@ -210,12 +200,12 @@ void WindowSystem::ConfigureImGuiStyle() {
 void WindowSystem::FocusWindowByName(std::string_view window_name, bool force_focus) {
   // Find the window by name
   ImGuiWindow* window = ImGui::FindWindowByName(window_name.data());
+
   if (window && !window->Collapsed) {
     // Check if we should force focus or if the mouse is hovering over this window
-    ImVec2 mouse_pos = ImGui::GetIO().MousePos;
-    bool is_hovering =
-      mouse_pos.x >= window->Pos.x && mouse_pos.x <= window->Pos.x + window->Size.x &&
-      mouse_pos.y >= window->Pos.y && mouse_pos.y <= window->Pos.y + window->Size.y;
+    bool is_hovering = ImGui::IsMouseHoveringRect(
+      window->Pos, ImVec2(window->Pos.x + window->Size.x, window->Pos.y + window->Size.y), false
+    );
 
     if (force_focus || is_hovering) {
       // Focus this window and handle scroll events
@@ -223,14 +213,6 @@ void WindowSystem::FocusWindowByName(std::string_view window_name, bool force_fo
       // Temporarily disable capture for other windows
       ImGui::GetIO().WantCaptureMouse = false;
     }
-  }
-}
-
-void WindowSystem::CheckMouseButtonsForCanvas() {
-  if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) || IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) ||
-      IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) {
-    // When any mouse button is pressed, try to focus the Canvas
-    FocusWindowByName("Canvas", false);  // Use hover check
   }
 }
 

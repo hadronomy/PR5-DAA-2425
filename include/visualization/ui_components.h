@@ -30,6 +30,9 @@ class UIComponents {
   void RenderWarningDialog(const char* title, const char* message, bool* p_open);
   void RenderSolutionStatsWindow();
 
+  // File dialog helper
+  std::string OpenFileDialog(const char* title, const char* const* filters, int num_filters);
+
   // Visualization
   void RenderProblemVisualization();
   void RenderDiagonalPattern(
