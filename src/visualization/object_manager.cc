@@ -48,7 +48,8 @@ void ObjectManager::AddLine(
   const Vector2& end,
   Color color,
   float thickness,
-  const std::string& label
+  const std::string& label,
+  const std::string& group_id
 ) {
   // Create a line object at the midpoint
   GraphicalObject line(
@@ -65,6 +66,9 @@ void ObjectManager::AddLine(
   line.AddData("endX", std::to_string(end.x));
   line.AddData("endY", std::to_string(end.y));
 
+  // Store group ID for route identification
+  line.group_id = group_id;
+
   // Add the line object to our collection
   objects_.push_back(line);
 }
@@ -75,7 +79,8 @@ void ObjectManager::AddDashedLine(
   Color color,
   float thickness,
   float dash_length,
-  const std::string& label
+  const std::string& label,
+  const std::string& group_id
 ) {
   // Similar to AddLine, but we'll mark it as a dashed line
   GraphicalObject line(
@@ -93,12 +98,287 @@ void ObjectManager::AddDashedLine(
   line.AddData("endY", std::to_string(end.y));
   line.AddData("dashLength", std::to_string(dash_length));
 
+  // Store group ID for route identification
+  line.group_id = group_id;
+
   // Add the line object to our collection
   objects_.push_back(line);
 }
 
+void ObjectManager::AssociateNodeWithGroup(
+  const std::string& node_id,
+  const std::string& group_id
+) {
+  node_to_group_map_[node_id].insert(group_id);
+}
+
+bool ObjectManager::IsPointNearLine(
+  const Vector2& point,
+  const Vector2& line_start,
+  const Vector2& line_end,
+  float threshold
+) {
+  // Calculate distance from point to line
+  // Algorithm from:
+  // https://stackoverflow.com/questions/849211/shortest-distance-between-a-point-and-a-line-segment
+
+  // Line vector
+  float line_length_sq = Vector2DistanceSqr(line_start, line_end);
+  if (line_length_sq == 0.0f)
+    return Vector2Distance(point, line_start) <= threshold;
+
+  // Project point onto line using dot product
+  float t = ((point.x - line_start.x) * (line_end.x - line_start.x) +
+             (point.y - line_start.y) * (line_end.y - line_start.y)) /
+            line_length_sq;
+
+  // Clamp t to [0,1] to get point on line segment
+  t = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
+
+  // Find the closest point on the line segment
+  Vector2 closest = {
+    line_start.x + t * (line_end.x - line_start.x), line_start.y + t * (line_end.y - line_start.y)
+  };
+
+  // Check if the distance is within threshold
+  return Vector2Distance(point, closest) <= threshold;
+}
+
+void ObjectManager::HandleObjectInteraction(
+  const Vector2& world_mouse_pos,
+  bool mouse_down,
+  bool mouse_released
+) {
+  // Reset previous hover state if needed
+  std::string new_hovered_group_id = "";
+  float closest_distance = 100.0f;  // Reasonable threshold for hover detection
+
+  // First, check for lines/routes (they have priority for hover)
+  for (auto& obj : objects_) {
+    if (obj.HasData("type") &&
+        (obj.GetData("type") == "line" || obj.GetData("type") == "dashed_line")) {
+
+      // Extract line endpoints
+      float startX = std::stof(obj.GetData("startX"));
+      float startY = std::stof(obj.GetData("startY"));
+      float endX = std::stof(obj.GetData("endX"));
+      float endY = std::stof(obj.GetData("endY"));
+
+      // Vector2 for calculations
+      Vector2 start = {startX, startY};
+      Vector2 end = {endX, endY};
+
+      // Calculate hover effect range based on line thickness
+      float hover_threshold = obj.size * 3.0f;  // 3x line thickness for comfortable hovering
+
+      // Check if mouse is near the line segment (not just the midpoint)
+      if (IsPointNearLine(world_mouse_pos, start, end, hover_threshold)) {
+        // Found a hover - use the group_id if available
+        if (!obj.group_id.empty()) {
+          // Calculate actual distance to line for priority (closer line wins)
+          // We need to find projection of point onto line
+          Vector2 line_vec = {end.x - start.x, end.y - start.y};
+          float line_length_sq = line_vec.x * line_vec.x + line_vec.y * line_vec.y;
+
+          if (line_length_sq > 0) {
+            float t = ((world_mouse_pos.x - start.x) * line_vec.x +
+                       (world_mouse_pos.y - start.y) * line_vec.y) /
+                      line_length_sq;
+            t = Clamp(t, 0.0f, 1.0f);
+
+            Vector2 projection = {start.x + t * line_vec.x, start.y + t * line_vec.y};
+
+            float dist = Vector2Distance(world_mouse_pos, projection);
+
+            if (dist < closest_distance) {
+              closest_distance = dist;
+              new_hovered_group_id = obj.group_id;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Now check for hover on nodes
+  for (auto& obj : objects_) {
+    // Skip lines - we already checked them
+    if (obj.HasData("type") &&
+        (obj.GetData("type") == "line" || obj.GetData("type") == "dashed_line")) {
+      continue;
+    }
+
+    // Check if mouse is hovering over the object
+    const float distance = Vector2Distance(world_mouse_pos, obj.position);
+    const float hover_radius = obj.size * CANVAS_UNIT_TO_METERS;
+    const bool is_hovered = distance <= hover_radius;
+
+    if (is_hovered) {
+      // If we have a node ID and it's associated with groups, use those groups
+      if (obj.HasData("ID")) {
+        std::string node_id = obj.GetData("ID");
+        auto it = node_to_group_map_.find(node_id);
+        if (it != node_to_group_map_.end() && !it->second.empty()) {
+          // Just use the first group for now (node could be in multiple routes)
+          new_hovered_group_id = *it->second.begin();
+          break;
+        }
+      }
+
+      // Only show tooltip when object is hovered
+      // Enhanced Tooltip Configuration
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 12));
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 6));
+      ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.11f, 0.12f, 0.14f, 0.94f));
+      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.8f, 0.8f, 0.8f, 0.25f));
+
+      ImGui::SetNextWindowSizeConstraints(ImVec2(320, 0), ImVec2(FLT_MAX, FLT_MAX));
+      ImGui::BeginTooltip();
+
+      ImGui::PushFont(ImGuiThemeManager::GetInstance().GetFont("Geist Mono"));
+
+      const float title_padding = 8.0f;
+      ImVec2 title_min = ImGui::GetCursorScreenPos();
+      ImVec2 title_max = {
+        title_min.x + ImGui::GetContentRegionAvail().x,
+        title_min.y + ImGui::GetFontSize() + title_padding * 2
+      };
+
+      ImDrawList* draw_list = ImGui::GetWindowDrawList();
+      draw_list->AddRectFilled(title_min, title_max, ImColor(0.18f, 0.2f, 0.25f, 0.9f), 5.0f);
+
+      draw_list->AddRectFilledMultiColor(
+        title_min,
+        title_max,
+        ImColor(0.4f, 0.5f, 0.7f, 0.3f),
+        ImColor(0.2f, 0.3f, 0.5f, 0.1f),
+        ImColor(0.2f, 0.3f, 0.5f, 0.1f),
+        ImColor(0.4f, 0.5f, 0.7f, 0.3f)
+      );
+
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + title_padding);
+      ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4.0f);
+      ImGui::TextColored(ImVec4(1.0f, 0.95f, 0.7f, 1.0f), "* %s", obj.name.c_str());
+      ImGui::SetCursorPosY(ImGui::GetCursorPosY() + title_padding - 2.0f);
+      ImGui::PopFont();
+
+      ImGui::Dummy(ImVec2(0, 4));
+      const ImVec2 sep_pos = ImGui::GetCursorScreenPos();
+      const float sep_width = ImGui::GetContentRegionAvail().x;
+      draw_list->AddRectFilled(
+        ImVec2(sep_pos.x, sep_pos.y),
+        ImVec2(sep_pos.x + sep_width, sep_pos.y + 1),
+        ImColor(0.6f, 0.7f, 1.0f, 0.4f)
+      );
+      draw_list->AddRectFilled(
+        ImVec2(sep_pos.x, sep_pos.y + 1),
+        ImVec2(sep_pos.x + sep_width, sep_pos.y + 2),
+        ImColor(0.3f, 0.4f, 0.7f, 0.2f)
+      );
+      ImGui::Dummy(ImVec2(0, 6));
+
+      ImGui::Columns(2, "ObjectProperties", false);
+      ImGui::SetColumnWidth(0, 100);
+
+      ImGui::TextColored(ImVec4(0.7f, 0.85f, 1.0f, 0.85f), "[P] Position:");
+      ImGui::NextColumn();
+      ImGui::TextColored(
+        ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%.1f, %.1f", obj.position.x, obj.position.y
+      );
+      ImGui::NextColumn();
+
+      const char* property_icons[] = {"[S]", "[C]", "[T]", "[#]"};
+      const auto& data = obj.GetAllData();
+      int property_count = 0;
+
+      for (const auto& [key, value] : data) {
+        ImGui::TextColored(
+          ImVec4(0.7f, 0.85f, 1.0f, 0.85f),
+          "%s %s:",
+          property_icons[property_count % 4],
+          key.c_str()
+        );
+        ImGui::NextColumn();
+        ImGui::TextColored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s", value.c_str());
+        ImGui::NextColumn();
+        property_count++;
+      }
+
+      ImGui::Columns(1);
+      ImGui::Dummy(ImVec2(0, 3));
+      const ImVec2 bottom_pos = ImGui::GetCursorScreenPos();
+      draw_list->AddRectFilledMultiColor(
+        bottom_pos,
+        ImVec2(bottom_pos.x + ImGui::GetWindowWidth() - 24, bottom_pos.y + 1),
+        ImColor(0.4f, 0.5f, 0.7f, 0.2f),
+        ImColor(0.6f, 0.7f, 0.9f, 0.4f),
+        ImColor(0.6f, 0.7f, 0.9f, 0.4f),
+        ImColor(0.4f, 0.5f, 0.7f, 0.2f)
+      );
+
+      ImGui::EndTooltip();
+      ImGui::PopStyleColor(2);
+      ImGui::PopStyleVar(3);
+    }
+  }
+
+  // Update the hover state if changed
+  if (new_hovered_group_id != hovered_group_id_) {
+    hovered_group_id_ = new_hovered_group_id;
+  }
+
+  // If we have hover on a route, show tooltip with route information
+  if (!hovered_group_id_.empty()) {
+    // Find a representative object from the group for info
+    for (const auto& obj : objects_) {
+      if (obj.group_id == hovered_group_id_ && obj.HasData("type") &&
+          (obj.GetData("type") == "line" || obj.GetData("type") == "dashed_line")) {
+
+        // Extract route name from the first matching object
+        std::string route_name = obj.name;
+
+        // Show route information tooltip
+        ImGui::BeginTooltip();
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 220, 150, 255));
+        ImGui::Text("%s", route_name.c_str());
+        ImGui::PopStyleColor();
+        ImGui::Text("Hover over route segments to highlight the route");
+        ImGui::EndTooltip();
+
+        break;
+      }
+    }
+  }
+}
+
+void ObjectManager::UpdateHoverEffects(float delta_time) {
+  for (auto& obj : objects_) {
+    // Make non-hovered elements practically invisible (0.001f is 0.1% opacity)
+    float target_alpha =
+      (!hovered_group_id_.empty() && obj.group_id != hovered_group_id_) ? 0.001f : 1.0f;
+
+    // Smooth transition of alpha
+    if (obj.hover_alpha != target_alpha) {
+      if (obj.hover_alpha < target_alpha)
+        obj.hover_alpha += hover_transition_speed_ * delta_time;
+      else
+        obj.hover_alpha -= hover_transition_speed_ * delta_time * 3.0f;  // Faster fade out
+
+      // Clamp the alpha value
+      if (obj.hover_alpha > 1.0f)
+        obj.hover_alpha = 1.0f;
+      if (obj.hover_alpha < 0.001f)
+        obj.hover_alpha = 0.001f;
+    }
+  }
+}
+
 void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float scale) {
-  // First, collect all transformed positions for overlap detection
+  // First, update hover effects
+  UpdateHoverEffects(GetFrameTime());
+
+  // Collect transformed positions for overlap detection
   std::vector<Vector2> transformed_positions(objects_.size());
   std::vector<float> transformed_sizes(objects_.size());
 
@@ -139,6 +419,25 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
       continue;
     }
 
+    // Only draw if this is the hovered group or if no group is hovered
+    bool is_hovered = hovered_group_id_.empty() || obj.group_id == hovered_group_id_;
+
+    // For non-hovered objects with extremely low alpha, skip drawing completely
+    if (!is_hovered && obj.hover_alpha < 0.01f) {
+      continue;  // Skip drawing this object entirely
+    }
+
+    // Apply hover effect to color more aggressively
+    Color line_color = obj.color;
+
+    // For non-hovered elements, ensure alpha is very low (max 5)
+    if (!is_hovered) {
+      line_color.a = static_cast<unsigned char>(fmin(5.0f, line_color.a * obj.hover_alpha));
+    } else {
+      // For hovered elements, enhance contrast
+      line_color.a = 255;  // Full opacity for hovered routes
+    }
+
     // Draw line objects
     if (obj.GetData("type") == "line") {
       // Extract line endpoints
@@ -155,7 +454,7 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
         endY = endY * scale + offset.y;
       }
 
-      // Calculate a thickness that remains visible when zoomed out with reduced values
+      // Calculate a thickness that remains visible when zoomed out
       float adjustedThickness = use_transformation
                                 ? fmaxf(obj.size / (scale > 0.01f ? scale : 0.01f), 15.0f)
                                 : fmaxf(obj.size, 15.0f);
@@ -163,10 +462,15 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
       // Reduced cap on maximum thickness
       adjustedThickness = fminf(adjustedThickness, 250.0f);
 
-      // Draw the line with adjusted thickness
-      DrawLineEx({startX, startY}, {endX, endY}, adjustedThickness, obj.color);
+      // Highlight current route with slightly increased thickness
+      if (!hovered_group_id_.empty() && obj.group_id == hovered_group_id_) {
+        adjustedThickness *= 1.5f;
+      }
+
+      // Draw the line with adjusted thickness and alpha
+      DrawLineEx({startX, startY}, {endX, endY}, adjustedThickness, line_color);
     }
-    // Draw dashed line objects
+    // Draw dashed line objects with similar hover effects
     else if (obj.GetData("type") == "dashed_line") {
       // Extract line endpoints
       float startX = std::stof(obj.GetData("startX"));
@@ -191,11 +495,16 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
       // Reduced cap on maximum thickness
       adjustedThickness = fminf(adjustedThickness, 300.0f);
 
+      // Highlight current route with slightly increased thickness
+      if (!hovered_group_id_.empty() && obj.group_id == hovered_group_id_) {
+        adjustedThickness *= 1.5f;
+      }
+
       // Also adjust dash length based on zoom, with reduced minimum values
       float adjustedDashLength =
         use_transformation ? fmaxf(dashLength * scale, 8.0f) : fmaxf(dashLength, 8.0f);
 
-      // Draw dashed line
+      // Draw dashed line with hover alpha
       Vector2 start = {startX, startY};
       Vector2 end = {endX, endY};
 
@@ -225,13 +534,13 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
           dashEnd = end;
         }
 
-        // Draw with adjusted thickness
-        DrawLineEx(dashStart, dashEnd, adjustedThickness, obj.color);
+        // Draw with adjusted thickness and hover alpha
+        DrawLineEx(dashStart, dashEnd, adjustedThickness, line_color);
       }
     }
   }
 
-  // SECOND PASS: Draw all shapes
+  // SECOND PASS: Draw all shapes with hover effects
   for (size_t i = 0; i < objects_.size(); i++) {
     auto& obj = objects_[i];
     Vector2 pos = transformed_positions[i];
@@ -243,31 +552,55 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
       continue;
     }
 
-    // Draw the object shape
-    DrawShape(pos, sz, obj.shape, obj.color);
+    // Only draw if this is the hovered group or if no group is hovered
+    bool is_hovered = hovered_group_id_.empty() || obj.group_id == hovered_group_id_;
 
-    // Draw outline
-    DrawCircleLines(pos.x, pos.y, sz, ColorAlpha(WHITE, 0.3f));
+    // For non-hovered objects with extremely low alpha, skip drawing completely
+    if (!is_hovered && obj.hover_alpha < 0.01f) {
+      continue;  // Skip drawing this node entirely
+    }
+
+    // Apply hover effect to color more aggressively
+    Color node_color = obj.color;
+
+    // For non-hovered elements, ensure alpha is very low (max 5)
+    if (!is_hovered) {
+      node_color.a = static_cast<unsigned char>(fmin(5.0f, node_color.a * obj.hover_alpha));
+    } else {
+      // For hovered elements, enhance contrast
+      node_color.a = 255;  // Full opacity for hovered nodes
+    }
+
+    // Draw the object shape with modified alpha
+    DrawShape(pos, sz, obj.shape, node_color);
+
+    // Draw outline with adjusted alpha
+    Color outline_color = ColorAlpha(WHITE, 0.3f * obj.hover_alpha);
+    DrawCircleLines(pos.x, pos.y, sz, outline_color);
 
     // For overlapping objects, draw a warning indicator
     if (has_overlap[i]) {
       // Create a pulsing effect
       float pulse = (sinf(GetTime() * 4.0f) + 1.0f) * 0.5f;
-      Color overlap_color = ColorAlpha(RED, 0.2f + pulse * 0.3f);
+      Color overlap_color = ColorAlpha(RED, (0.2f + pulse * 0.3f) * obj.hover_alpha);
 
       // Draw concentric warning circles
       DrawCircleLines(pos.x, pos.y, sz * 1.2f, overlap_color);
       DrawCircleLines(pos.x, pos.y, sz * 1.4f, overlap_color);
 
-      // Draw warning text above the object
+      // Draw warning text above the object with adjusted alpha
       const char* warning_text = "Overlapping!";
       float text_width = MeasureText(warning_text, 10);
-      DrawText(warning_text, pos.x - text_width / 2, pos.y - sz - 15, 10, RED);
+      Color warning_color = RED;
+      warning_color.a = static_cast<unsigned char>(warning_color.a * obj.hover_alpha);
+      DrawText(warning_text, pos.x - text_width / 2, pos.y - sz - 15, 10, warning_color);
     }
 
-    // Draw the object name if size is large enough
+    // Draw the object name if size is large enough, with adjusted alpha
     if (sz > 15.0f) {
-      DrawText(obj.name.c_str(), pos.x - sz / 2, pos.y - sz - 10, 10, WHITE);
+      Color text_color = WHITE;
+      text_color.a = static_cast<unsigned char>(text_color.a * obj.hover_alpha);
+      DrawText(obj.name.c_str(), pos.x - sz / 2, pos.y - sz - 10, 10, text_color);
     }
   }
 }
@@ -305,135 +638,6 @@ void ObjectManager::DrawShape(const Vector2& position, float size, ObjectShape s
       DrawPoly(position, sides, size, 0.0f, color);
       break;
     }
-  }
-}
-
-void ObjectManager::HandleObjectInteraction(
-  const Vector2& world_mouse_pos,
-  bool mouse_down,
-  bool mouse_released
-) {
-  // Calculate hover state for each object
-  for (auto& obj : objects_) {
-    // Check if mouse is hovering over the object
-    const float distance = Vector2Distance(world_mouse_pos, obj.position);
-    const float hover_radius = obj.size * CANVAS_UNIT_TO_METERS;
-    const bool is_hovered = distance <= hover_radius;
-
-    // Only show tooltip when object is hovered
-    if (!is_hovered)
-      continue;
-
-    // ╭──────────────────────────────────────────╮
-    // │ Enhanced Tooltip Configuration           │
-    // ╰──────────────────────────────────────────╯
-
-    // Create a more attractive tooltip style
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 12));
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 6));
-    ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.11f, 0.12f, 0.14f, 0.94f));
-    ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.8f, 0.8f, 0.8f, 0.25f));
-
-    // Set tooltip width constraints
-    ImGui::SetNextWindowSizeConstraints(ImVec2(320, 0), ImVec2(FLT_MAX, FLT_MAX));
-    ImGui::BeginTooltip();
-
-    // ╭──────────────────────────────────────────╮
-    // │ Enhanced Title with Decoration           │
-    // ╰──────────────────────────────────────────╯
-    ImGui::PushFont(ImGuiThemeManager::GetInstance().GetFont("Geist Mono"));
-
-    // Title background with gradient effect
-    const float title_padding = 8.0f;
-    ImVec2 title_min = ImGui::GetCursorScreenPos();
-    ImVec2 title_max = {
-      title_min.x + ImGui::GetContentRegionAvail().x,
-      title_min.y + ImGui::GetFontSize() + title_padding * 2
-    };
-
-    ImDrawList* draw_list = ImGui::GetWindowDrawList();
-    draw_list->AddRectFilled(title_min, title_max, ImColor(0.18f, 0.2f, 0.25f, 0.9f), 5.0f);
-
-    // Add gradient overlay to title
-    draw_list->AddRectFilledMultiColor(
-      title_min,
-      title_max,
-      ImColor(0.4f, 0.5f, 0.7f, 0.3f),
-      ImColor(0.2f, 0.3f, 0.5f, 0.1f),
-      ImColor(0.2f, 0.3f, 0.5f, 0.1f),
-      ImColor(0.4f, 0.5f, 0.7f, 0.3f)
-    );
-
-    // Title text with sparkle
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + title_padding);
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4.0f);
-    ImGui::TextColored(ImVec4(1.0f, 0.95f, 0.7f, 1.0f), "* %s", obj.name.c_str());
-    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + title_padding - 2.0f);
-    ImGui::PopFont();
-
-    // Fancy separator
-    ImGui::Dummy(ImVec2(0, 4));
-    const ImVec2 sep_pos = ImGui::GetCursorScreenPos();
-    const float sep_width = ImGui::GetContentRegionAvail().x;
-    draw_list->AddRectFilled(
-      ImVec2(sep_pos.x, sep_pos.y),
-      ImVec2(sep_pos.x + sep_width, sep_pos.y + 1),
-      ImColor(0.6f, 0.7f, 1.0f, 0.4f)
-    );
-    draw_list->AddRectFilled(
-      ImVec2(sep_pos.x, sep_pos.y + 1),
-      ImVec2(sep_pos.x + sep_width, sep_pos.y + 2),
-      ImColor(0.3f, 0.4f, 0.7f, 0.2f)
-    );
-    ImGui::Dummy(ImVec2(0, 6));
-
-    // ╭──────────────────────────────────────────╮
-    // │ Enhanced Properties Display              │
-    // ╰──────────────────────────────────────────╯
-    ImGui::Columns(2, "ObjectProperties", false);
-    ImGui::SetColumnWidth(0, 100);
-
-    // Property display with icons
-    ImGui::TextColored(ImVec4(0.7f, 0.85f, 1.0f, 0.85f), "[P] Position:");
-    ImGui::NextColumn();
-    ImGui::TextColored(
-      ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%.1f, %.1f", obj.position.x, obj.position.y
-    );
-    ImGui::NextColumn();
-
-    // Display important properties with icons
-    const char* property_icons[] = {"[S]", "[C]", "[T]", "[#]"};
-    const auto& data = obj.GetAllData();
-    int property_count = 0;
-
-    for (const auto& [key, value] : data) {
-      ImGui::TextColored(
-        ImVec4(0.7f, 0.85f, 1.0f, 0.85f), "%s %s:", property_icons[property_count % 4], key.c_str()
-      );
-      ImGui::NextColumn();
-      ImGui::TextColored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s", value.c_str());
-      ImGui::NextColumn();
-      property_count++;
-    }
-
-    // Bottom decoration
-    ImGui::Columns(1);
-    ImGui::Dummy(ImVec2(0, 3));
-    const ImVec2 bottom_pos = ImGui::GetCursorScreenPos();
-    draw_list->AddRectFilledMultiColor(
-      bottom_pos,
-      ImVec2(bottom_pos.x + ImGui::GetWindowWidth() - 24, bottom_pos.y + 1),
-      ImColor(0.4f, 0.5f, 0.7f, 0.2f),
-      ImColor(0.6f, 0.7f, 0.9f, 0.4f),
-      ImColor(0.6f, 0.7f, 0.9f, 0.4f),
-      ImColor(0.4f, 0.5f, 0.7f, 0.2f)
-    );
-
-    // Cleanup
-    ImGui::EndTooltip();
-    ImGui::PopStyleColor(2);
-    ImGui::PopStyleVar(3);
   }
 }
 

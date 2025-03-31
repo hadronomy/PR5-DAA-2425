@@ -2,6 +2,8 @@
 
 #include <map>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "raylib.h"
@@ -41,6 +43,9 @@ class GraphicalObject {
   std::string name;
   ObjectShape shape;
   bool dragging;
+  // Add route group identifier and hover state
+  std::string group_id;
+  float hover_alpha = 1.0f;  // For smooth transitions
 
  private:
   std::map<std::string, std::string> data_;
@@ -78,30 +83,49 @@ class ObjectManager {
   // Access objects
   const std::vector<GraphicalObject>& GetObjects() const { return objects_; }
 
-  // Add a line between two points
+  // Add a line between two points with group ID for route identification
   void AddLine(
     const Vector2& start,
     const Vector2& end,
     Color color,
     float thickness = 2.0f,
-    const std::string& label = ""
+    const std::string& label = "",
+    const std::string& group_id = ""
   );
 
-  // Add a dashed line between two points
+  // Add a dashed line between two points with group ID for route identification
   void AddDashedLine(
     const Vector2& start,
     const Vector2& end,
     Color color,
     float thickness = 2.0f,
     float dash_length = 5.0f,
-    const std::string& label = ""
+    const std::string& label = "",
+    const std::string& group_id = ""
   );
+
+  // Associate node with a route group
+  void AssociateNodeWithGroup(const std::string& node_id, const std::string& group_id);
 
  private:
   std::vector<GraphicalObject> objects_;
+  std::string hovered_group_id_;
+  std::unordered_map<std::string, std::unordered_set<std::string>> node_to_group_map_;
+  float hover_transition_speed_ = 5.0f;  // Speed of hover effect transition
 
   // Helper methods for drawing different shapes
   void DrawShape(const Vector2& position, float size, ObjectShape shape, Color color);
+
+  // Helper method to detect if mouse is near a line
+  bool IsPointNearLine(
+    const Vector2& point,
+    const Vector2& line_start,
+    const Vector2& line_end,
+    float threshold
+  );
+
+  // Apply hover effects to objects based on groups
+  void UpdateHoverEffects(float delta_time);
 };
 
 }  // namespace visualization

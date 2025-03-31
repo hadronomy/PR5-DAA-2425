@@ -307,7 +307,7 @@ void UIComponents::RenderProblemSelector() {
 
           // Use a unique ID for the context menu
           std::string context_menu_id = "context_menu_" + std::to_string(i) + "_" + problem_path;
-          
+
           // Add context menu for additional files to allow removal
           if (ImGui::BeginPopupContextItem(context_menu_id.c_str())) {
             if (ImGui::MenuItem(("Remove from list##" + std::to_string(i)).c_str())) {
@@ -556,6 +556,7 @@ void UIComponents::RenderProblemVisualization() {
   );
   depot_obj.AddData("Type", "Depot");
   depot_obj.AddData("Description", "Starting point for all vehicles");
+  depot_obj.AddData("ID", depot.id());  // Add ID for route group association
 
   // Store depot coordinates
   location_coords[depot.id()] = {static_cast<float>(depot.x()), static_cast<float>(depot.y())};
@@ -570,6 +571,7 @@ void UIComponents::RenderProblemVisualization() {
   );
   landfill_obj.AddData("Type", "Landfill");
   landfill_obj.AddData("Description", "Final disposal site for waste");
+  landfill_obj.AddData("ID", landfill.id());  // Add ID for route group association
 
   // Store landfill coordinates
   location_coords[landfill.id()] = {
@@ -631,6 +633,8 @@ void UIComponents::RenderProblemVisualization() {
 
     // Draw CV routes
     const auto& cv_routes = solution->getCVRoutes();
+
+    // Generate distinct colors for each CV route based on total count
     for (size_t i = 0; i < cv_routes.size(); ++i) {
       const auto& route = cv_routes[i];
       const auto& locations = route.locationIds();
@@ -638,18 +642,31 @@ void UIComponents::RenderProblemVisualization() {
       if (locations.empty())
         continue;
 
-      // Generate route color with transparency (vary the hue for different routes)
-      // Add transparency by setting alpha to 180 (about 70% opacity)
-      Color route_color = ColorFromHSV(240.0f * (i % 5) / 5.0f, 0.7f, 0.9f);
+      // Generate a distinct color for each route
+      // Use golden ratio to create well-distributed colors across the hue spectrum (0-240)
+      float golden_ratio = 0.618033988749895f;
+      float hue = fmodf(i * golden_ratio, 1.0f) * 240.0f;
+
+      // Vary saturation and brightness slightly to create even more distinction
+      float saturation = 0.7f + fmodf(i * 0.1f, 0.3f);
+      float value = 0.85f + fmodf(i * 0.07f, 0.15f);
+
+      Color route_color = ColorFromHSV(hue, saturation, value);
       route_color.a = 180;  // Add transparency
 
       // Add route information
       std::ostringstream route_name;
       route_name << "CV Route " << (i + 1);
 
+      // Create unique group ID for this CV route
+      std::string group_id = "cv_route_" + std::to_string(i);
+
       // Add the depot as starting point
       std::string prev_id = problem->getDepot().id();
       Vector2 prev_pos = location_coords[prev_id];
+
+      // Associate depot with this route group
+      object_manager_->AssociateNodeWithGroup(prev_id, group_id);
 
       for (size_t j = 0; j < locations.size(); ++j) {
         const auto& loc_id = locations[j];
@@ -658,10 +675,15 @@ void UIComponents::RenderProblemVisualization() {
         if (location_coords.find(loc_id) == location_coords.end())
           continue;
 
+        // Associate this location with the route group
+        object_manager_->AssociateNodeWithGroup(loc_id, group_id);
+
         Vector2 curr_pos = location_coords[loc_id];
 
-        // Draw route segment with reduced thickness (half of previous value)
-        object_manager_->AddLine(prev_pos, curr_pos, route_color, 75.0f, route_name.str());
+        // Draw route segment with group ID for hover detection
+        object_manager_->AddLine(
+          prev_pos, curr_pos, route_color, 75.0f, route_name.str(), group_id
+        );
 
         prev_id = loc_id;
         prev_pos = curr_pos;
@@ -670,7 +692,12 @@ void UIComponents::RenderProblemVisualization() {
       // Close route back to depot if needed
       if (prev_id != problem->getDepot().id() && !locations.empty()) {
         object_manager_->AddLine(
-          prev_pos, location_coords[problem->getDepot().id()], route_color, 75.0f, route_name.str()
+          prev_pos,
+          location_coords[problem->getDepot().id()],
+          route_color,
+          75.0f,
+          route_name.str(),
+          group_id
         );
       }
     }
@@ -684,18 +711,31 @@ void UIComponents::RenderProblemVisualization() {
       if (locations.empty())
         continue;
 
-      // Generate TV route color with transparency (yellow-orange range)
-      // Add transparency by setting alpha to 180 (about 70% opacity)
-      Color route_color = ColorFromHSV(30.0f + 20.0f * (i % 5) / 5.0f, 0.8f, 0.9f);
+      // Generate distinct colors for TV routes - use a different hue range (240-360)
+      // This ensures TV routes are visually different from CV routes
+      float golden_ratio = 0.618033988749895f;
+      float hue = 240.0f + fmodf(i * golden_ratio, 1.0f) * 120.0f;
+
+      // Vary saturation and brightness slightly
+      float saturation = 0.8f + fmodf(i * 0.12f, 0.2f);
+      float value = 0.9f + fmodf(i * 0.05f, 0.1f);
+
+      Color route_color = ColorFromHSV(hue, saturation, value);
       route_color.a = 180;  // Add transparency
 
       // Add route information
       std::ostringstream route_name;
       route_name << "TV Route " << (i + 1);
 
+      // Create unique group ID for this TV route
+      std::string group_id = "tv_route_" + std::to_string(i);
+
       // Add the landfill as starting point
       std::string prev_id = problem->getLandfill().id();
       Vector2 prev_pos = location_coords[prev_id];
+
+      // Associate landfill with this route
+      object_manager_->AssociateNodeWithGroup(prev_id, group_id);
 
       for (size_t j = 0; j < locations.size(); ++j) {
         const auto& loc_id = locations[j];
@@ -704,11 +744,14 @@ void UIComponents::RenderProblemVisualization() {
         if (location_coords.find(loc_id) == location_coords.end())
           continue;
 
+        // Associate this location with the route group
+        object_manager_->AssociateNodeWithGroup(loc_id, group_id);
+
         Vector2 curr_pos = location_coords[loc_id];
 
-        // Draw route segment with reduced thickness (half of previous value)
+        // Draw route segment with group ID for hover detection
         object_manager_->AddDashedLine(
-          prev_pos, curr_pos, route_color, 100.0f, 15.0f, route_name.str()
+          prev_pos, curr_pos, route_color, 100.0f, 15.0f, route_name.str(), group_id
         );
 
         prev_id = loc_id;
@@ -723,7 +766,8 @@ void UIComponents::RenderProblemVisualization() {
           route_color,
           100.0f,
           15.0f,
-          route_name.str()
+          route_name.str(),
+          group_id
         );
       }
     }
