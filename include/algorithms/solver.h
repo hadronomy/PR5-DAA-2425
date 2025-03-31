@@ -4,7 +4,6 @@
 #include <string>
 
 #include "algorithm_registry.h"
-#include "algorithms/greedy_tv_scheduler.h"
 #include "algorithms/vrpt_solution.h"
 #include "problem/vrpt_problem.h"
 
