@@ -16,6 +16,15 @@ namespace visualization {
 ProblemManager::ProblemManager() : current_problem_filename_("") {}
 
 bool ProblemManager::scanDirectory(const std::string& dir_path) {
+  // Remember the currently selected problem if any
+  std::string previously_selected = current_problem_filename_;
+
+  // Clear the cache of loaded problems to force reload from files
+  problems_.clear();
+  current_problem_filename_ = "";
+  // Clear any existing solution
+  clearSolution();
+
   available_problems_.clear();
 
   try {
@@ -38,6 +47,15 @@ bool ProblemManager::scanDirectory(const std::string& dir_path) {
 
     // Sort alphabetically for better UI presentation
     std::sort(available_problems_.begin(), available_problems_.end());
+
+    // If there was a previously selected problem and it still exists, reload it
+    if (!previously_selected.empty()) {
+      auto it =
+        std::find(available_problems_.begin(), available_problems_.end(), previously_selected);
+      if (it != available_problems_.end()) {
+        loadProblem(previously_selected);
+      }
+    }
 
     return true;
   } catch (const fs::filesystem_error& e) {
