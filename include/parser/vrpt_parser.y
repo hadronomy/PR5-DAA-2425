@@ -48,8 +48,8 @@
         int id;
         double x;
         double y;
-        double waste_amount;
         double service_time;
+        double waste_amount;
     };
 }
 
