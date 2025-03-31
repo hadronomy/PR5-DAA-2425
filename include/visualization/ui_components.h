@@ -28,6 +28,7 @@ class UIComponents {
   void RenderProblemInspector();
   void RenderAlgorithmSelector();
   void RenderWarningDialog(const char* title, const char* message, bool* p_open);
+  void RenderSolutionStatsWindow();
 
   // Visualization
   void RenderProblemVisualization();
@@ -46,6 +47,7 @@ class UIComponents {
   bool show_problem_inspector_;
   bool show_algorithm_selector_;
   bool show_no_algorithm_warning_;
+  bool show_solution_stats_;
 };
 
 }  // namespace visualization

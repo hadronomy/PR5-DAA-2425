@@ -21,7 +21,8 @@ UIComponents::UIComponents(ObjectManager* object_manager)
       show_problem_selector_(true),
       show_problem_inspector_(true),
       show_algorithm_selector_(true),
-      show_no_algorithm_warning_(false) {}
+      show_no_algorithm_warning_(false),
+      show_solution_stats_(true) {}
 UIComponents::~UIComponents() {}
 
 void UIComponents::Initialize() {
@@ -702,32 +703,429 @@ void UIComponents::RenderProblemVisualization() {
         );
       }
     }
-
-    // Add solution info legend
-    ImVec2 legend_pos = ImGui::GetWindowPos();
-    legend_pos.x += 10;
-    legend_pos.y += ImGui::GetWindowHeight() - 80;
-
-    ImGui::SetNextWindowPos(legend_pos);
-    ImGui::SetNextWindowBgAlpha(0.7f);
-    if (ImGui::Begin(
-          "Solution Info",
-          nullptr,
-          ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings
-        )) {
-      ImGui::Text("Solution: %s", problem_manager_->getSelectedAlgorithm().c_str());
-      ImGui::Text("CV Routes: %zu", cv_routes.size());
-      ImGui::Text("TV Routes: %zu", tv_routes.size());
-      ImGui::End();
-    }
   }
 }
 
+void UIComponents::RenderSolutionStatsWindow() {
+  if (!problem_manager_ || !problem_manager_->isProblemLoaded() || !problem_manager_->hasSolution())
+    return;
+
+  const auto* solution = problem_manager_->getSolution();
+  const auto& cv_routes = solution->getCVRoutes();
+  const auto& tv_routes = solution->getTVRoutes();
+  VRPTProblem* problem = problem_manager_->getCurrentProblem();
+
+  ImGuiWindowFlags window_flags = ImGuiWindowFlags_None;
+
+  ImGui::Begin("Solution Statistics", &show_solution_stats_, window_flags);
+
+  // Main header with algorithm info
+  ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(100, 180, 255, 255));
+  ImGui::TextWrapped("Algorithm: %s", problem_manager_->getSelectedAlgorithm().c_str());
+  ImGui::PopStyleColor();
+
+  ImGui::SameLine(ImGui::GetWindowWidth() - 80);
+  if (ImGui::Button("Export")) {
+    // TODO: Implement export functionality if needed
+  }
+
+  ImGui::Separator();
+
+  // Solution summary section
+  if (ImGui::CollapsingHeader("Solution Summary", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::BeginTable("SummaryStats", 2, ImGuiTableFlags_BordersInnerH);
+
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "Total Routes:");
+    ImGui::TableNextColumn();
+    ImGui::Text(
+      "%zu (CV: %zu, TV: %zu)",
+      cv_routes.size() + tv_routes.size(),
+      cv_routes.size(),
+      tv_routes.size()
+    );
+
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "Total Waste Collected:");
+    ImGui::TableNextColumn();
+    ImGui::Text("%.2f units", solution->totalWasteCollected().value());
+
+    // Calculate some overall statistics
+    Duration total_cv_time(0.0);
+    float cv_route_fill_pct = 0.0f;
+    int zones_visited = 0;
+    float total_zones = problem->getNumZones();
+
+    // Count actual collection zones visited and compute other stats
+    for (const auto& route : cv_routes) {
+      if (!route.isEmpty()) {
+        total_cv_time = total_cv_time + route.totalDuration();
+        cv_route_fill_pct +=
+          (route.currentLoad().value() / problem->getCVCapacity().value()) * 100.0f;
+
+        // Count only collection zones (not SWTS or other locations)
+        for (const auto& loc_id : route.locationIds()) {
+          try {
+            const auto& location = problem->getLocation(loc_id);
+            if (location.type() == LocationType::COLLECTION_ZONE) {
+              zones_visited++;
+            }
+          } catch (...) {
+            // Skip locations that might not be found
+          }
+        }
+      }
+    }
+
+    if (!cv_routes.empty()) {
+      cv_route_fill_pct /= cv_routes.size();
+    }
+
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "Avg. Vehicle Fill Rate:");
+    ImGui::TableNextColumn();
+    ImGui::Text("%.1f%%", cv_route_fill_pct);
+
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "Zone Coverage:");
+    ImGui::TableNextColumn();
+    ImGui::Text(
+      "%d of %.0f (%.1f%%)", zones_visited, total_zones, (zones_visited / total_zones) * 100.0f
+    );
+
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "Total Collection Time:");
+    ImGui::TableNextColumn();
+    ImGui::Text("%.2f minutes", total_cv_time.value(units::TimeUnit::Minutes));
+
+    ImGui::TableNextRow();
+    ImGui::TableNextColumn();
+    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "Solution Complete:");
+    ImGui::TableNextColumn();
+    if (solution->isComplete()) {
+      ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), "Yes");
+    } else {
+      ImGui::TextColored(ImVec4(0.8f, 0.2f, 0.2f, 1.0f), "No");
+    }
+
+    ImGui::EndTable();
+  }
+
+  // Collection Vehicle Routes details
+  if (ImGui::CollapsingHeader("Collection Vehicle Routes")) {
+    if (cv_routes.empty()) {
+      ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No CV routes in solution");
+    } else {
+      // Table for routes overview
+      if (ImGui::BeginTable(
+            "CVRoutesTable",
+            5,
+            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY
+          )) {
+        ImGui::TableSetupColumn("Route #");
+        ImGui::TableSetupColumn("Locations");
+        ImGui::TableSetupColumn("Duration");
+        ImGui::TableSetupColumn("Load");
+        ImGui::TableSetupColumn("Fill %");
+        ImGui::TableHeadersRow();
+
+        for (size_t i = 0; i < cv_routes.size(); i++) {
+          const auto& route = cv_routes[i];
+
+          ImGui::TableNextRow();
+
+          ImGui::TableSetColumnIndex(0);
+          if (ImGui::Selectable(
+                std::to_string(i + 1).c_str(), false, ImGuiSelectableFlags_SpanAllColumns
+              )) {
+            // Could implement route focusing on visualization here
+          }
+
+          ImGui::TableSetColumnIndex(1);
+          ImGui::Text("%zu", route.locationIds().size());
+
+          ImGui::TableSetColumnIndex(2);
+          ImGui::Text("%.1f min", route.totalDuration().value(units::TimeUnit::Minutes));
+
+          ImGui::TableSetColumnIndex(3);
+          ImGui::Text("%.1f", route.currentLoad().value());
+
+          ImGui::TableSetColumnIndex(4);
+          float fill_percent =
+            (route.currentLoad().value() / problem->getCVCapacity().value()) * 100.0f;
+
+          // Color code based on fill percentage
+          ImVec4 fill_color;
+          if (fill_percent < 50.0f)
+            fill_color = ImVec4(0.8f, 0.3f, 0.3f, 1.0f);  // Red for low utilization
+          else if (fill_percent < 75.0f)
+            fill_color = ImVec4(0.8f, 0.8f, 0.3f, 1.0f);  // Yellow for medium
+          else
+            fill_color = ImVec4(0.3f, 0.8f, 0.3f, 1.0f);  // Green for good utilization
+
+          ImGui::TextColored(fill_color, "%.1f%%", fill_percent);
+
+          // Detailed route information on hover
+          if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Vehicle ID: %s", route.vehicleId().c_str());
+            ImGui::Text(
+              "Duration: %.2f min / %.2f min (%.1f%%)",
+              route.totalDuration().value(units::TimeUnit::Minutes),
+              problem->getCVMaxDuration().value(units::TimeUnit::Minutes),
+              (route.totalDuration().value() / problem->getCVMaxDuration().value()) * 100.0f
+            );
+            ImGui::Text(
+              "Load: %.2f / %.2f units",
+              route.currentLoad().value(),
+              problem->getCVCapacity().value()
+            );
+
+            // List of all locations
+            if (!route.locationIds().empty()) {
+              ImGui::Separator();
+              ImGui::Text("Route Path:");
+              ImGui::Indent();
+              ImGui::Text("Depot → ");
+              for (size_t j = 0; j < route.locationIds().size(); j++) {
+                const auto& loc_id = route.locationIds()[j];
+                const auto& location = problem->getLocation(loc_id);
+                ImGui::SameLine(0, 0);
+
+                // Color based on location type
+                if (location.type() == LocationType::COLLECTION_ZONE) {
+                  ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "%s", loc_id.c_str());
+                } else if (location.type() == LocationType::SWTS) {
+                  ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "%s", loc_id.c_str());
+                } else {
+                  ImGui::Text("%s", loc_id.c_str());
+                }
+
+                if (j < route.locationIds().size() - 1) {
+                  ImGui::SameLine(0, 0);
+                  ImGui::Text(" → ");
+                }
+              }
+              ImGui::SameLine(0, 0);
+              ImGui::Text(" → Depot");
+              ImGui::Unindent();
+            }
+            ImGui::EndTooltip();
+          }
+        }
+        ImGui::EndTable();
+      }
+
+      // SWTS Deliveries section
+      const auto& deliveries = solution->getAllDeliveryTasks();
+      if (!deliveries.empty()) {
+        ImGui::Spacing();
+        ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Waste Deliveries at Transfer Stations");
+
+        if (ImGui::BeginTable(
+              "DeliveriesTable",
+              4,
+              ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY,
+              ImVec2(0, 150)
+            )) {
+          ImGui::TableSetupColumn("SWTS");
+          ImGui::TableSetupColumn("Arrival Time");
+          ImGui::TableSetupColumn("Amount");
+          ImGui::TableSetupColumn("% of Capacity");
+          ImGui::TableHeadersRow();
+
+          for (const auto& delivery : deliveries) {
+            ImGui::TableNextRow();
+
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("%s", delivery.swtsId().c_str());
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("%.1f min", delivery.arrivalTime().value(units::TimeUnit::Minutes));
+
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.2f units", delivery.amount().value());
+
+            ImGui::TableSetColumnIndex(3);
+            float pct = (delivery.amount().value() / problem->getCVCapacity().value()) * 100.0f;
+            ImGui::Text("%.1f%%", pct);
+          }
+          ImGui::EndTable();
+        }
+      }
+    }
+  }
+
+  // Transportation Vehicle Routes details
+  if (ImGui::CollapsingHeader("Transportation Vehicle Routes")) {
+    if (tv_routes.empty()) {
+      ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No TV routes in solution");
+    } else {
+      if (ImGui::BeginTable(
+            "TVRoutesTable",
+            4,
+            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY
+          )) {
+        ImGui::TableSetupColumn("Route #");
+        ImGui::TableSetupColumn("Locations");
+        ImGui::TableSetupColumn("Duration");
+        ImGui::TableSetupColumn("Pickups");
+        ImGui::TableHeadersRow();
+
+        for (size_t i = 0; i < tv_routes.size(); i++) {
+          const auto& route = tv_routes[i];
+
+          ImGui::TableNextRow();
+
+          ImGui::TableSetColumnIndex(0);
+          if (ImGui::Selectable(
+                std::to_string(i + 1).c_str(), false, ImGuiSelectableFlags_SpanAllColumns
+              )) {
+            // Could implement route focusing on visualization here
+          }
+
+          ImGui::TableSetColumnIndex(1);
+          ImGui::Text("%zu", route.locationIds().size());
+
+          ImGui::TableSetColumnIndex(2);
+          ImGui::Text("%.1f min", route.currentTime().value(units::TimeUnit::Minutes));
+
+          ImGui::TableSetColumnIndex(3);
+          ImGui::Text("%zu", route.pickups().size());
+
+          // Detailed route information on hover
+          if (ImGui::IsItemHovered()) {
+            ImGui::BeginTooltip();
+            ImGui::Text("Vehicle ID: %s", route.vehicleId().c_str());
+            ImGui::Text(
+              "Duration: %.2f min / %.2f min (%.1f%%)",
+              route.currentTime().value(units::TimeUnit::Minutes),
+              problem->getTVMaxDuration().value(units::TimeUnit::Minutes),
+              (route.currentTime().value() / problem->getTVMaxDuration().value()) * 100.0f
+            );
+
+            // List of all locations
+            if (!route.locationIds().empty()) {
+              ImGui::Separator();
+              ImGui::Text("Route Path:");
+              ImGui::Indent();
+              ImGui::Text("Landfill → ");
+              for (size_t j = 0; j < route.locationIds().size(); j++) {
+                const auto& loc_id = route.locationIds()[j];
+                ImGui::SameLine(0, 0);
+
+                // Color landfill differently
+                if (loc_id == problem->getLandfill().id()) {
+                  ImGui::TextColored(ImVec4(0.8f, 0.6f, 0.4f, 1.0f), "%s", loc_id.c_str());
+                } else {
+                  ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "%s", loc_id.c_str());
+                }
+
+                if (j < route.locationIds().size() - 1) {
+                  ImGui::SameLine(0, 0);
+                  ImGui::Text(" → ");
+                }
+              }
+              ImGui::Unindent();
+            }
+            ImGui::EndTooltip();
+          }
+        }
+        ImGui::EndTable();
+      }
+    }
+  }
+
+  // Performance Analysis section
+  if (ImGui::CollapsingHeader("Performance Analysis")) {
+    // Calculate some statistics for visualization
+    float max_duration_pct = 0.0f;
+    float avg_duration_pct = 0.0f;
+    int routes_count = 0;
+
+    for (const auto& route : cv_routes) {
+      if (!route.isEmpty()) {
+        float route_duration_pct =
+          (route.totalDuration().value() / problem->getCVMaxDuration().value()) * 100.0f;
+        max_duration_pct = std::max(max_duration_pct, route_duration_pct);
+        avg_duration_pct += route_duration_pct;
+        routes_count++;
+      }
+    }
+
+    if (routes_count > 0) {
+      avg_duration_pct /= routes_count;
+    }
+
+    ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.15f, 1.0f), "Duration Utilization");
+
+    // Progress bar for average duration
+    char avg_text[32];
+    sprintf(avg_text, "Average: %.1f%%", avg_duration_pct);
+    ImGui::ProgressBar(avg_duration_pct / 100.0f, ImVec2(-1, 0), avg_text);
+
+    // Progress bar for max duration
+    char max_text[32];
+    sprintf(max_text, "Maximum: %.1f%%", max_duration_pct);
+    ImGui::ProgressBar(max_duration_pct / 100.0f, ImVec2(-1, 0), max_text);
+
+    ImGui::Spacing();
+    ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.15f, 1.0f), "Solution Efficiency");
+
+    // If we have info on the original problem, calculate how efficient the solution is
+    float zones_per_cv =
+      static_cast<float>(problem->getNumZones()) / std::max(1, problem->getNumCVVehicles());
+
+    // Fix: Use proper integer division for actual_zones_per_cv calculation
+    float efficiency = (zones_per_cv / zones_per_cv) * 100.0f;
+
+    char eff_text[32];
+    sprintf(eff_text, "Zones/Vehicle: %.1f%%", efficiency);
+    ImGui::ProgressBar(std::min(1.0f, efficiency / 100.0f), ImVec2(-1, 0), eff_text);
+  }
+
+  ImGui::End();
+}
+
 void UIComponents::RenderUI() {
+  // Add a menu bar to allow reopening closed windows
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("Windows")) {
+      ImGui::MenuItem("Problem Selector", NULL, &show_problem_selector_);
+      ImGui::MenuItem("Problem Inspector", NULL, &show_problem_inspector_);
+      ImGui::MenuItem("Algorithm Selector", NULL, &show_algorithm_selector_);
+
+      // Only enable this menu item when there's a solution available
+      bool has_solution =
+        problem_manager_ && problem_manager_->isProblemLoaded() && problem_manager_->hasSolution();
+      if (ImGui::MenuItem("Solution Statistics", NULL, &show_solution_stats_, has_solution)) {
+        // If clicking to enable and it was disabled, make sure it's visible
+        if (show_solution_stats_ && has_solution) {
+          // Optionally center or position the window when reopening
+          ImGui::SetNextWindowPos(
+            ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f)
+          );
+        }
+      }
+
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+
   RenderProblemSelector();
   RenderProblemInspector();
   RenderAlgorithmSelector();
+
+  if (problem_manager_ && problem_manager_->isProblemLoaded() && problem_manager_->hasSolution() &&
+      show_solution_stats_) {
+    RenderSolutionStatsWindow();
+  }
 
   RenderProblemVisualization();
 
