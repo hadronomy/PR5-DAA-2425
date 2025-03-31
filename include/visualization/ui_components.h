@@ -68,6 +68,7 @@ class UIComponents {
   bool show_algorithm_selector_;
   bool show_no_algorithm_warning_;
   bool show_solution_stats_;
+  bool show_benchmark_results_;
 };
 
 }  // namespace visualization

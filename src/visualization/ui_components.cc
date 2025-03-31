@@ -23,7 +23,8 @@ UIComponents::UIComponents(ObjectManager* object_manager)
       show_problem_inspector_(true),
       show_algorithm_selector_(true),
       show_no_algorithm_warning_(false),
-      show_solution_stats_(true) {}
+      show_solution_stats_(true),
+      show_benchmark_results_(false) {}
 
 UIComponents::~UIComponents() {}
 
@@ -561,9 +562,29 @@ void UIComponents::RenderAlgorithmSelector() {
   problem_manager_->setSelectedAlgorithm("VRPTSolver");
   problem_manager_->renderAlgorithmConfigurationUI();
 
-  if (ImGui::Button("Run Algorithm", ImVec2(-FLT_MIN, 0))) {
-    if (!problem_manager_->runAlgorithm()) {
-      show_no_algorithm_warning_ = true;
+  if (problem_manager_->isAlgorithmRunning()) {
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.5f, 0.3f, 0.5f));
+    ImGui::Button("Algorithm Running...", ImVec2(-FLT_MIN, 0));
+    ImGui::PopStyleColor();
+  } else {
+    // Use a horizontal layout for buttons
+    float width = ImGui::GetContentRegionAvail().x;
+    float button_width = (width - ImGui::GetStyle().ItemSpacing.x) / 2;
+
+    if (ImGui::Button("Run Algorithm", ImVec2(button_width, 0))) {
+      if (!problem_manager_->runAlgorithm()) {
+        show_no_algorithm_warning_ = true;
+      }
+    }
+
+    ImGui::SameLine();
+
+    if (ImGui::Button("Benchmark All", ImVec2(button_width, 0))) {
+      if (problem_manager_->runBenchmark()) {
+        show_benchmark_results_ = true;
+      } else {
+        show_no_algorithm_warning_ = true;
+      }
     }
   }
 
@@ -1245,6 +1266,13 @@ void UIComponents::RenderUI() {
         }
       }
 
+      // Add the benchmark results menu item
+      if (ImGui::MenuItem("Benchmark Results", NULL, &show_benchmark_results_)) {
+        if (problem_manager_) {
+          problem_manager_->setShowBenchmarkResults(show_benchmark_results_);
+        }
+      }
+
       ImGui::EndMenu();
     }
     ImGui::EndMainMenuBar();
@@ -1254,9 +1282,31 @@ void UIComponents::RenderUI() {
   RenderProblemInspector();
   RenderAlgorithmSelector();
 
-  if (problem_manager_ && problem_manager_->isProblemLoaded() && problem_manager_->hasSolution() &&
-      show_solution_stats_) {
+  // Check algorithm/benchmark completion each frame
+  if (problem_manager_ && problem_manager_->isAlgorithmRunning()) {
+    // Show the progress dialog
+    problem_manager_->renderAlgorithmProgressDialog();
+
+    // Check if algorithm completed this frame
+    if (problem_manager_->checkAlgorithmCompletion()) {
+      // Algorithm finished! Show solution stats if successful
+      if (problem_manager_->hasSolution()) {
+        show_solution_stats_ = true;
+      }
+    }
+
+    // Check if benchmark completed
+    problem_manager_->checkBenchmarkCompletion();
+  }
+
+  // Show solution stats if available
+  if (problem_manager_ && problem_manager_->hasSolution() && show_solution_stats_) {
     RenderSolutionStatsWindow();
+  }
+
+  // Show benchmark results if the window is enabled in UI
+  if (problem_manager_ && show_benchmark_results_) {
+    problem_manager_->renderBenchmarkResultsWindow(&show_benchmark_results_);
   }
 
   RenderProblemVisualization();

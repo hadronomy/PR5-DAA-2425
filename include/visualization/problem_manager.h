@@ -1,6 +1,9 @@
 #pragma once
 
+#include <atomic>
+#include <chrono>
 #include <functional>
+#include <future>
 #include <memory>
 #include <set>
 #include <string>
@@ -76,6 +79,18 @@ class ProblemManager {
   // Run selected algorithm with current problem
   bool runAlgorithm();
 
+  // Check if algorithm is currently running
+  bool isAlgorithmRunning() const { return algorithm_running_; }
+
+  // Check if algorithm has completed and process results
+  bool checkAlgorithmCompletion();
+
+  // Display the algorithm progress dialog
+  void renderAlgorithmProgressDialog();
+
+  // Cancel a running algorithm
+  void cancelAlgorithm();
+
   // Get the bounds of the current problem
   Rectangle GetCurrentProblemBounds() const;
 
@@ -101,6 +116,32 @@ class ProblemManager {
 
   // Render algorithm configuration UI
   void renderAlgorithmConfigurationUI();
+
+  // Benchmark-related structures and methods
+  struct BenchmarkResult {
+    std::string instance_name;
+    int num_zones;
+    int run_number;
+    int cv_count;
+    int tv_count;
+    double cpu_time_ms;
+  };
+
+  // Run benchmark on all available problems
+  bool runBenchmark(int runs_per_instance = 3);
+
+  // Check if benchmark is running
+  bool isBenchmarkRunning() const { return benchmark_running_; }
+
+  // Check for benchmark completion
+  bool checkBenchmarkCompletion();
+
+  // Display benchmark results
+  void renderBenchmarkResultsWindow(bool* p_open = nullptr);
+
+  // Show/hide benchmark results window
+  bool shouldShowBenchmarkResults() const { return show_benchmark_results_; }
+  void setShowBenchmarkResults(bool show) { show_benchmark_results_ = show; }
 
  private:
   // Map of filename to problem instance
@@ -134,6 +175,21 @@ class ProblemManager {
   std::unique_ptr<daa::TypedAlgorithm<VRPTProblem, daa::algorithm::VRPTSolution>>
     current_algorithm_;
   bool has_solution_ = false;
+
+  // Async algorithm management
+  std::future<std::unique_ptr<algorithm::VRPTSolution>> algorithm_future_;
+  bool algorithm_running_ = false;
+  float algorithm_progress_ = 0.0f;
+  std::string algorithm_status_message_ = "Initializing...";
+  std::chrono::steady_clock::time_point algorithm_start_time_;
+
+  // Benchmark-related member variables
+  std::vector<BenchmarkResult> benchmark_results_;
+  bool benchmark_running_ = false;
+  bool show_benchmark_results_ = false;
+  std::atomic<int> benchmark_completed_count_{0};
+  std::atomic<int> benchmark_total_count_{0};
+  std::future<void> benchmark_future_;
 };
 
 }  // namespace visualization
