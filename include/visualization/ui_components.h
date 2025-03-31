@@ -1,9 +1,11 @@
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "imgui.h"
 
+#include "visualization/canvas.h"
 #include "visualization/object_manager.h"
 #include "visualization/problem_manager.h"
 
@@ -18,6 +20,9 @@ class UIComponents {
   void Initialize();
   void SetProblemManager(ProblemManager* problem_manager);
   void ScanProblemsDirectory(const std::string& dir_path = "examples");
+
+  // Set canvas reference for route focusing
+  void SetCanvas(Canvas* canvas) { canvas_ = canvas; }
 
   void RenderUI();
 
@@ -42,6 +47,18 @@ class UIComponents {
     float thickness,
     float spacing
   );
+
+  // Route selection and focusing
+  void SetSelectedRoute(const std::string& route_type, int route_index);
+  void ClearSelectedRoute();
+  void FocusOnSelectedRoute();
+
+  struct RouteSelection {
+    std::string type;  // "cv" or "tv"
+    int index;         // Route index
+  };
+  std::optional<RouteSelection> selected_route_;
+  Canvas* canvas_;
 
   ObjectManager* object_manager_;
   ProblemManager* problem_manager_;

@@ -107,9 +107,15 @@ class ObjectManager {
   // Associate node with a route group
   void AssociateNodeWithGroup(const std::string& node_id, const std::string& group_id);
 
+  // Route selection methods
+  void SetSelectedRouteGroup(const std::string& group_id) { selected_group_id_ = group_id; }
+  void ClearSelectedRouteGroup() { selected_group_id_ = ""; }
+  const std::string& GetSelectedRouteGroup() const { return selected_group_id_; }
+
  private:
   std::vector<GraphicalObject> objects_;
   std::string hovered_group_id_;
+  std::string selected_group_id_;  // For explicit route selection
   std::unordered_map<std::string, std::unordered_set<std::string>> node_to_group_map_;
   float hover_transition_speed_ = 5.0f;  // Speed of hover effect transition
 

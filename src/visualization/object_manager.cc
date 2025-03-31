@@ -354,9 +354,16 @@ void ObjectManager::HandleObjectInteraction(
 
 void ObjectManager::UpdateHoverEffects(float delta_time) {
   for (auto& obj : objects_) {
-    // Make non-hovered elements practically invisible (0.001f is 0.1% opacity)
-    float target_alpha =
-      (!hovered_group_id_.empty() && obj.group_id != hovered_group_id_) ? 0.001f : 1.0f;
+    // If we have a selected route, prioritize it over hover
+    std::string priority_group =
+      !selected_group_id_.empty() ? selected_group_id_ : hovered_group_id_;
+
+    // Target alpha - prioritize selection over hover
+    float target_alpha = 1.0f;
+    if (!priority_group.empty() && obj.group_id != priority_group) {
+      // Make non-selected/non-hovered elements practically invisible
+      target_alpha = 0.001f;
+    }
 
     // Smooth transition of alpha
     if (obj.hover_alpha != target_alpha) {
@@ -419,23 +426,35 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
       continue;
     }
 
-    // Only draw if this is the hovered group or if no group is hovered
-    bool is_hovered = hovered_group_id_.empty() || obj.group_id == hovered_group_id_;
+    // Use priority group ID (selection takes precedence over hover)
+    std::string priority_group =
+      !selected_group_id_.empty() ? selected_group_id_ : hovered_group_id_;
 
-    // For non-hovered objects with extremely low alpha, skip drawing completely
-    if (!is_hovered && obj.hover_alpha < 0.01f) {
+    // Only draw if this is the priority group or if no priority group is set
+    bool is_priority = priority_group.empty() || obj.group_id == priority_group;
+
+    // For non-priority objects with extremely low alpha, skip drawing completely
+    if (!is_priority && obj.hover_alpha < 0.01f) {
       continue;  // Skip drawing this object entirely
     }
 
-    // Apply hover effect to color more aggressively
+    // Apply emphasis effect to selected/hovered routes
     Color line_color = obj.color;
 
-    // For non-hovered elements, ensure alpha is very low (max 5)
-    if (!is_hovered) {
+    // For non-priority elements, ensure alpha is very low
+    if (!is_priority) {
       line_color.a = static_cast<unsigned char>(fmin(5.0f, line_color.a * obj.hover_alpha));
     } else {
-      // For hovered elements, enhance contrast
-      line_color.a = 255;  // Full opacity for hovered routes
+      // For priority elements (selected or hovered), enhance contrast
+      line_color.a = 255;  // Full opacity
+
+      // If this route is explicitly selected (not just hovered), make it even more pronounced
+      if (!selected_group_id_.empty() && obj.group_id == selected_group_id_) {
+        // Brighten the color slightly for selected routes
+        line_color.r = static_cast<unsigned char>(fmin(255.0f, line_color.r * 1.2f));
+        line_color.g = static_cast<unsigned char>(fmin(255.0f, line_color.g * 1.2f));
+        line_color.b = static_cast<unsigned char>(fmin(255.0f, line_color.b * 1.2f));
+      }
     }
 
     // Draw line objects
@@ -462,9 +481,11 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
       // Reduced cap on maximum thickness
       adjustedThickness = fminf(adjustedThickness, 250.0f);
 
-      // Highlight current route with slightly increased thickness
-      if (!hovered_group_id_.empty() && obj.group_id == hovered_group_id_) {
-        adjustedThickness *= 1.5f;
+      // Add brighter highlight for selected routes
+      if (!selected_group_id_.empty() && obj.group_id == selected_group_id_) {
+        adjustedThickness *= 2.0f;  // Make selected routes much thicker
+      } else if (!hovered_group_id_.empty() && obj.group_id == hovered_group_id_) {
+        adjustedThickness *= 1.5f;  // Make hovered routes somewhat thicker
       }
 
       // Draw the line with adjusted thickness and alpha
@@ -495,9 +516,11 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
       // Reduced cap on maximum thickness
       adjustedThickness = fminf(adjustedThickness, 300.0f);
 
-      // Highlight current route with slightly increased thickness
-      if (!hovered_group_id_.empty() && obj.group_id == hovered_group_id_) {
-        adjustedThickness *= 1.5f;
+      // Add brighter highlight for selected routes
+      if (!selected_group_id_.empty() && obj.group_id == selected_group_id_) {
+        adjustedThickness *= 2.0f;  // Make selected routes much thicker
+      } else if (!hovered_group_id_.empty() && obj.group_id == hovered_group_id_) {
+        adjustedThickness *= 1.5f;  // Make hovered routes somewhat thicker
       }
 
       // Also adjust dash length based on zoom, with reduced minimum values
@@ -552,23 +575,35 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
       continue;
     }
 
-    // Only draw if this is the hovered group or if no group is hovered
-    bool is_hovered = hovered_group_id_.empty() || obj.group_id == hovered_group_id_;
+    // Use priority group ID (selection takes precedence over hover)
+    std::string priority_group =
+      !selected_group_id_.empty() ? selected_group_id_ : hovered_group_id_;
 
-    // For non-hovered objects with extremely low alpha, skip drawing completely
-    if (!is_hovered && obj.hover_alpha < 0.01f) {
+    // Only draw if this is the priority group or if no priority group is set
+    bool is_priority = priority_group.empty() || obj.group_id == priority_group;
+
+    // For non-priority objects with extremely low alpha, skip drawing completely
+    if (!is_priority && obj.hover_alpha < 0.01f) {
       continue;  // Skip drawing this node entirely
     }
 
-    // Apply hover effect to color more aggressively
+    // Apply emphasis effect to selected/hovered nodes
     Color node_color = obj.color;
 
-    // For non-hovered elements, ensure alpha is very low (max 5)
-    if (!is_hovered) {
+    // For non-priority elements, ensure alpha is very low
+    if (!is_priority) {
       node_color.a = static_cast<unsigned char>(fmin(5.0f, node_color.a * obj.hover_alpha));
     } else {
-      // For hovered elements, enhance contrast
-      node_color.a = 255;  // Full opacity for hovered nodes
+      // For priority elements (selected or hovered), enhance contrast
+      node_color.a = 255;  // Full opacity
+
+      // If this node is explicitly selected (not just hovered), make it even more pronounced
+      if (!selected_group_id_.empty() && obj.group_id == selected_group_id_) {
+        // Brighten the color slightly for selected nodes
+        node_color.r = static_cast<unsigned char>(fmin(255.0f, node_color.r * 1.2f));
+        node_color.g = static_cast<unsigned char>(fmin(255.0f, node_color.g * 1.2f));
+        node_color.b = static_cast<unsigned char>(fmin(255.0f, node_color.b * 1.2f));
+      }
     }
 
     // Draw the object shape with modified alpha

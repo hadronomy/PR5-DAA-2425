@@ -22,7 +22,9 @@ UIComponents::UIComponents(ObjectManager* object_manager)
       show_problem_inspector_(true),
       show_algorithm_selector_(true),
       show_no_algorithm_warning_(false),
-      show_solution_stats_(true) {}
+      show_solution_stats_(true),
+      canvas_(nullptr) {}
+
 UIComponents::~UIComponents() {}
 
 void UIComponents::Initialize() {
@@ -470,6 +472,80 @@ void UIComponents::RenderProblemInspector() {
   ImGui::End();
 }
 
+void UIComponents::SetSelectedRoute(const std::string& route_type, int route_index) {
+  selected_route_ = RouteSelection{route_type, route_index};
+
+  // Update visualization to highlight the selected route
+  std::string group_id = route_type + "_route_" + std::to_string(route_index);
+  object_manager_->SetSelectedRouteGroup(group_id);
+
+  // Focus the camera on the selected route
+  FocusOnSelectedRoute();
+}
+
+void UIComponents::ClearSelectedRoute() {
+  selected_route_.reset();
+  object_manager_->ClearSelectedRouteGroup();
+}
+
+void UIComponents::FocusOnSelectedRoute() {
+  if (!selected_route_ || !canvas_ || !problem_manager_ || !problem_manager_->hasSolution())
+    return;
+
+  const auto* solution = problem_manager_->getSolution();
+  Rectangle bounds{0, 0, 0, 0};
+  bool has_bounds = false;
+
+  // Get all points in the route to calculate bounds
+  std::vector<Vector2> route_points;
+
+  // Find all objects belonging to this route group and collect their positions
+  std::string group_id = selected_route_->type + "_route_" + std::to_string(selected_route_->index);
+
+  for (const auto& obj : object_manager_->GetObjects()) {
+    if (obj.group_id == group_id) {
+      // For lines, add both endpoints
+      if (obj.HasData("type") &&
+          (obj.GetData("type") == "line" || obj.GetData("type") == "dashed_line")) {
+        float startX = std::stof(obj.GetData("startX"));
+        float startY = std::stof(obj.GetData("startY"));
+        float endX = std::stof(obj.GetData("endX"));
+        float endY = std::stof(obj.GetData("endY"));
+
+        route_points.push_back({startX, startY});
+        route_points.push_back({endX, endY});
+      }
+      // For other objects, add their position
+      else {
+        route_points.push_back(obj.position);
+      }
+    }
+  }
+
+  // Calculate bounds from collected points
+  if (!route_points.empty()) {
+    float min_x = std::numeric_limits<float>::max();
+    float min_y = std::numeric_limits<float>::max();
+    float max_x = std::numeric_limits<float>::lowest();
+    float max_y = std::numeric_limits<float>::lowest();
+
+    for (const auto& point : route_points) {
+      min_x = std::min(min_x, point.x);
+      min_y = std::min(min_y, point.y);
+      max_x = std::max(max_x, point.x);
+      max_y = std::max(max_y, point.y);
+    }
+
+    bounds = {min_x, min_y, max_x - min_x, max_y - min_y};
+    has_bounds = true;
+  }
+
+  // Tell canvas to fit the view to these bounds
+  if (has_bounds) {
+    canvas_->FitViewToBounds(bounds, 0.2f);  // 20% padding
+  }
+}
+
 void UIComponents::RenderAlgorithmSelector() {
   if (!show_algorithm_selector_ || !problem_manager_)
     return;
@@ -908,10 +984,20 @@ void UIComponents::RenderSolutionStatsWindow() {
           ImGui::TableNextRow();
 
           ImGui::TableSetColumnIndex(0);
+          // Check if this is the selected route
+          bool is_selected = selected_route_ && selected_route_->type == "cv" &&
+                             selected_route_->index == static_cast<int>(i);
+
+          // Modified selectable with focus highlighting and selection state
           if (ImGui::Selectable(
-                std::to_string(i + 1).c_str(), false, ImGuiSelectableFlags_SpanAllColumns
+                std::to_string(i + 1).c_str(), is_selected, ImGuiSelectableFlags_SpanAllColumns
               )) {
-            // Could implement route focusing on visualization here
+            // Toggle selection
+            if (is_selected) {
+              ClearSelectedRoute();
+            } else {
+              SetSelectedRoute("cv", i);
+            }
           }
 
           ImGui::TableSetColumnIndex(1);
@@ -1051,10 +1137,20 @@ void UIComponents::RenderSolutionStatsWindow() {
           ImGui::TableNextRow();
 
           ImGui::TableSetColumnIndex(0);
+          // Check if this is the selected route
+          bool is_selected = selected_route_ && selected_route_->type == "tv" &&
+                             selected_route_->index == static_cast<int>(i);
+
+          // Modified selectable with focusing
           if (ImGui::Selectable(
-                std::to_string(i + 1).c_str(), false, ImGuiSelectableFlags_SpanAllColumns
+                std::to_string(i + 1).c_str(), is_selected, ImGuiSelectableFlags_SpanAllColumns
               )) {
-            // Could implement route focusing on visualization here
+            // Toggle selection
+            if (is_selected) {
+              ClearSelectedRoute();
+            } else {
+              SetSelectedRoute("tv", i);
+            }
           }
 
           ImGui::TableSetColumnIndex(1);
