@@ -424,47 +424,12 @@ void UIComponents::RenderAlgorithmSelector() {
     return;
   }
 
-  // Step 1: Select algorithm type
-  std::vector<std::string> meta_algorithms = {"GVNS", "MultiStart", "VRPTSolver"};
+  problem_manager_->setSelectedAlgorithm("VRPTSolver");
+  problem_manager_->renderAlgorithmConfigurationUI();
 
-  ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Step 1: Select Algorithm");
-
-  // Get the current algorithm name
-  std::string selected_algorithm = problem_manager_->getSelectedAlgorithm();
-
-  if (ImGui::BeginCombo(
-        "Algorithm Type",
-        selected_algorithm.empty() ? "Select Algorithm" : selected_algorithm.c_str()
-      )) {
-    for (const auto& algo : meta_algorithms) {
-      bool is_selected = (selected_algorithm == algo);
-      if (ImGui::Selectable(algo.c_str(), is_selected)) {
-        problem_manager_->setSelectedAlgorithm(algo);
-      }
-      if (is_selected) {
-        ImGui::SetItemDefaultFocus();
-      }
-    }
-    ImGui::EndCombo();
-  }
-
-  // Step 2: Configure algorithm parameters
-  if (!selected_algorithm.empty()) {
-    ImGui::Separator();
-    ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Step 2: Configure Parameters");
-
-    // Render algorithm-specific configuration UI
-    problem_manager_->renderAlgorithmConfigurationUI();
-
-    ImGui::Separator();
-
-    // Run button
-    if (ImGui::Button("Run Algorithm", ImVec2(-FLT_MIN, 0))) {
-      if (problem_manager_->runAlgorithm()) {
-        // Algorithm ran successfully
-      } else {
-        show_no_algorithm_warning_ = true;
-      }
+  if (ImGui::Button("Run Algorithm", ImVec2(-FLT_MIN, 0))) {
+    if (!problem_manager_->runAlgorithm()) {
+      show_no_algorithm_warning_ = true;
     }
   }
 

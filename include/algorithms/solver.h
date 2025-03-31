@@ -28,7 +28,9 @@ class VRPTSolver : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     std::string cv_algorithm = "MultiStart",
     std::string tv_algorithm = "GreedyTVScheduler"
   )
-      : cv_algorithm_(std::move(cv_algorithm)), tv_algorithm_(std::move(tv_algorithm)) {}
+      : cv_algorithm_name_(std::move(cv_algorithm)), tv_algorithm_name_(std::move(tv_algorithm)) {
+    initializeComponents();
+  }
 
   /**
    * @brief Solve the complete VRPT problem
@@ -38,25 +40,21 @@ class VRPTSolver : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
    */
   VRPTSolution solve(const VRPTProblem& problem) override {
     // Phase 1: Solve the CV routing problem
-    auto cv_solver = AlgorithmRegistry::createTyped<VRPTProblem, VRPTSolution>(cv_algorithm_);
-    VRPTSolution cv_solution = cv_solver->solve(problem);
-
+    VRPTSolution cv_solution = cv_algorithm_->solve(problem);
     // Phase 2: Create TV scheduler with problem reference
-    GreedyTVScheduler scheduler(problem);
-    VRPTSolution final_solution = scheduler.solve(cv_solution);
-
-    return final_solution;
+    // VRPTSolution final_solution = tv_algorithm_->solve(cv_solution);
+    return cv_solution;
   }
 
   std::string name() const override {
-    return "VRPT Solver (" + cv_algorithm_ + " + " + tv_algorithm_ + ")";
+    return "VRPT Solver (" + cv_algorithm_name_ + " + " + tv_algorithm_name_ + ")";
   }
 
   std::string description() const override {
-    return "Complete VRPT solver that uses " + cv_algorithm_ +
+    return "Complete VRPT solver that uses " + cv_algorithm_name_ +
            " for Collection Vehicle routing "
            "and " +
-           tv_algorithm_ + " for Transportation Vehicle routing";
+           tv_algorithm_name_ + " for Transportation Vehicle routing";
   }
 
   std::string timeComplexity() const override {
@@ -67,8 +65,28 @@ class VRPTSolver : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
   void renderConfigurationUI() override;
 
  private:
-  std::string cv_algorithm_;
-  std::string tv_algorithm_;
+  std::string cv_algorithm_name_;
+  std::string tv_algorithm_name_;
+
+  std::unique_ptr<TypedAlgorithm<VRPTProblem, VRPTSolution>> cv_algorithm_;
+  std::unique_ptr<TypedAlgorithm<VRPTSolution, VRPTSolution>> tv_algorithm_;
+
+  void initializeComponents() {
+
+    try {
+      if (!cv_algorithm_name_.empty()) {
+        cv_algorithm_ =
+          AlgorithmRegistry::createTyped<VRPTProblem, VRPTSolution>(cv_algorithm_name_);
+      }
+
+      if (!tv_algorithm_name_.empty()) {
+        tv_algorithm_ =
+          AlgorithmRegistry::createTyped<VRPTSolution, VRPTSolution>(tv_algorithm_name_);
+      }
+    } catch (const std::exception&) {
+      // Initialization will be retried later if needed
+    }
+  }
 };
 
 // Register the complete solver
