@@ -99,10 +99,7 @@ class Duration {
   constexpr Duration() noexcept : nanoseconds_(0) {}
 
   explicit constexpr Duration(double value, units::TimeUnit unit = units::TimeUnit::Nanoseconds)
-      : nanoseconds_(convertToNanoseconds(value, unit)) {
-    if (nanoseconds_ < 0)
-      throw std::invalid_argument("Duration cannot be negative");
-  }
+      : nanoseconds_(convertToNanoseconds(value, unit)) {}
 
   [[nodiscard]] static constexpr int64_t convertToNanoseconds(double value, units::TimeUnit from) {
     switch (from) {
@@ -174,16 +171,12 @@ class Duration {
 
   // Subtraction operators
   Duration& operator-=(const Duration& other) {
-    if (nanoseconds_ < other.nanoseconds_)
-      throw std::invalid_argument("Duration cannot be negative");
     nanoseconds_ -= other.nanoseconds_;
     return *this;
   }
 
   template <TimeConvertible T>
   Duration& operator-=(const T& other) {
-    if (nanoseconds_ < other.nanoseconds())
-      throw std::invalid_argument("Duration cannot be negative");
     nanoseconds_ -= other.nanoseconds();
     return *this;
   }
@@ -201,15 +194,13 @@ class Duration {
 
   // Scalar multiplication and division
   Duration& operator*=(double scalar) {
-    if (scalar < 0.0)
-      throw std::invalid_argument("Result cannot be negative");
     nanoseconds_ = static_cast<int64_t>(static_cast<double>(nanoseconds_) * scalar);
     return *this;
   }
 
   Duration& operator/=(double scalar) {
-    if (scalar <= 0.0)
-      throw std::invalid_argument("Cannot divide by zero or negative value");
+    if (scalar == 0.0)
+      throw std::invalid_argument("Cannot divide by zero");
     nanoseconds_ = static_cast<int64_t>(static_cast<double>(nanoseconds_) / scalar);
     return *this;
   }

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "algorithm_registry.h"
+#include "algorithms/greedy_tv_scheduler.h"
 #include "algorithms/vrpt_solution.h"
 #include "problem/vrpt_problem.h"
 
@@ -41,8 +42,17 @@ class VRPTSolver : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     // Phase 1: Solve the CV routing problem
     VRPTSolution cv_solution = cv_algorithm_->solve(problem);
     // Phase 2: Create TV scheduler with problem reference
-    // VRPTSolution final_solution = tv_algorithm_->solve(cv_solution);
-    return cv_solution;
+    try {
+      VRPTSolution final_solution = tv_algorithm_->solve({
+        problem,
+        cv_solution,
+      });
+      return final_solution;
+    } catch (const std::exception& e) {
+      std::cerr << "Error in TV scheduling: " << e.what() << std::endl;
+      // If TV scheduling fails, return just the CV solution
+      return cv_solution;
+    }
   }
 
   std::string name() const override {
@@ -68,7 +78,7 @@ class VRPTSolver : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
   std::string tv_algorithm_name_;
 
   std::unique_ptr<TypedAlgorithm<VRPTProblem, VRPTSolution>> cv_algorithm_;
-  std::unique_ptr<TypedAlgorithm<VRPTSolution, VRPTSolution>> tv_algorithm_;
+  std::unique_ptr<TypedAlgorithm<VRPTData, VRPTSolution>> tv_algorithm_;
 
   void initializeComponents() {
 
@@ -79,12 +89,9 @@ class VRPTSolver : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
       }
 
       if (!tv_algorithm_name_.empty()) {
-        tv_algorithm_ =
-          AlgorithmRegistry::createTyped<VRPTSolution, VRPTSolution>(tv_algorithm_name_);
+        tv_algorithm_ = AlgorithmRegistry::createTyped<VRPTData, VRPTSolution>(tv_algorithm_name_);
       }
-    } catch (const std::exception&) {
-      // Initialization will be retried later if needed
-    }
+    } catch (const std::exception&) {}
   }
 };
 

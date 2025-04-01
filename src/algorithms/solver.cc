@@ -62,7 +62,7 @@ void VRPTSolver::renderConfigurationUI() {
         // Set the selected algorithm in the problem manager
         tv_algorithm_name_ = algo;
         tv_algorithm_ =
-          AlgorithmRegistry::createTyped<VRPTSolution, VRPTSolution>(tv_algorithm_name_);
+          AlgorithmRegistry::createTyped<VRPTData, VRPTSolution>(tv_algorithm_name_);
       }
       if (is_selected) {
         ImGui::SetItemDefaultFocus();

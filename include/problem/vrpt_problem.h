@@ -49,9 +49,9 @@ class VRPTProblem {
     units::DistanceUnit::Kilometers,
     units::TimeUnit::Hours
   };  // V: Vehicle speed (km/h)
-  double epsilon_{0.0};  // Epsilon parameter
-  double offset_{0.0};   // Offset parameter
-  int k_param_{0};       // k parameter
+  Duration epsilon_{0.0};  // Epsilon parameter
+  double offset_{0.0};     // Offset parameter
+  int k_param_{0};         // k parameter
 
   // KDTree for spatial queries
   KDTree location_tree_;
@@ -111,7 +111,10 @@ class VRPTProblem {
         units::DistanceUnit::Kilometers,
         units::TimeUnit::Hours,
       };
-      epsilon_ = driver.parameters.epsilon;
+      epsilon_ = Duration{
+        driver.parameters.epsilon,
+        units::TimeUnit::Minutes,
+      };
       offset_ = driver.parameters.offset;
       k_param_ = driver.parameters.k_param;
 
@@ -322,6 +325,8 @@ class VRPTProblem {
     return location_tree_.getTravelTime(from_id, to_id);
   }
 
+  [[nodiscard]] Duration getEpsilon() const noexcept { return epsilon_; }
+
   /**
    * @brief Check if the problem is loaded
    * @return True if problem data is loaded, false otherwise
@@ -379,7 +384,7 @@ class VRPTProblem {
     }
 
     // Parameters
-    oss << "epsilon " << epsilon_ << '\n';
+    oss << "epsilon " << epsilon_.minutes() << '\n';
     oss << "offset " << offset_ << '\n';
     oss << "k " << k_param_ << '\n';
 

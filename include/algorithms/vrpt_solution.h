@@ -201,23 +201,6 @@ class TVRoute {
       new_time = arrival_time;
     }
 
-    // Check if adding this load exceeds capacity
-    if (current_load_ + amount > max_capacity_) {
-      // Need to visit landfill first
-      if (!addLocation(problem.getLandfill().id(), problem)) {
-        return false;  // Can't add landfill, so can't add this pickup
-      }
-
-      // Try adding the pickup again
-      return addPickup(swts_id, arrival_time, amount, problem);
-    }
-
-    // Check duration constraint
-    Duration return_time = problem.getTravelTime(swts_id, problem.getLandfill().id());
-    if (new_time + return_time > max_duration_) {
-      return false;
-    }
-
     // Add SWTS to route
     location_ids_.push_back(swts_id);
 
@@ -251,7 +234,9 @@ class TVRoute {
     }
 
     // Check time constraint
-    if (current_time_ > max_duration_) {
+    // Skip the time constraint check if going to the landfill
+    if (location_id != problem.getLandfill().id() &&
+        current_time_ > max_duration_ + problem.getEpsilon()) {
       return false;
     }
 
