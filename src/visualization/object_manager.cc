@@ -1,5 +1,6 @@
 #include <cstdint>
 
+#include "raylib.h"
 #include "visualization/canvas.h"
 #include "visualization/imgui_theme.h"
 #include "visualization/object_manager.h"
@@ -490,6 +491,39 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
 
       // Draw the line with adjusted thickness and alpha
       DrawLineEx({startX, startY}, {endX, endY}, adjustedThickness, line_color);
+      // Draw arrow at the end of the line
+      // Calculate direction vector from start to end
+      Vector2 dir = {endX - startX, endY - startY};
+      float length = sqrtf(dir.x * dir.x + dir.y * dir.y);
+      
+      // Normalize direction
+      if (length > 0) {
+        dir.x /= length;
+        dir.y /= length;
+      }
+      
+      // Calculate perpendicular vector
+      Vector2 perp = {-dir.y, dir.x};
+      
+      // Arrow size (proportional to line thickness)
+      float arrowSize = adjustedThickness * 10.0f;
+      
+      // Calculate arrow points
+      Vector2 arrowTip = {endX, endY};
+      Vector2 arrowBase1 = {
+        endX - dir.x * arrowSize + perp.x * arrowSize * 0.5f,
+        endY - dir.y * arrowSize + perp.y * arrowSize * 0.5f
+      };
+      Vector2 arrowBase2 = {
+        endX - dir.x * arrowSize - perp.x * arrowSize * 0.5f,
+        endY - dir.y * arrowSize - perp.y * arrowSize * 0.5f
+      };
+
+      // Fills the gap
+      DrawCircle(arrowTip.x, arrowTip.y, adjustedThickness * 0.5f, line_color);
+      
+      // Draw the arrow
+      DrawTriangle(arrowTip, arrowBase1, arrowBase2, line_color);
     }
     // Draw dashed line objects with similar hover effects
     else if (obj.GetData("type") == "dashed_line") {
