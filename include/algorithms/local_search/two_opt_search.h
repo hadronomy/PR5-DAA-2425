@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 #include "algorithm_registry.h"
 #include "algorithms/local_search/cv_local_search.h"
@@ -34,8 +35,13 @@ class TwoOptSearch : public CVLocalSearch {
   VRPTSolution searchNeighborhood(const VRPTProblem& problem, const VRPTSolution& current_solution)
     override {
     VRPTSolution best_solution = current_solution;
-    size_t best_cv_count = best_solution.getCVCount();
-    int max_cv_vehicles = problem.getNumCVVehicles();
+    size_t original_cv_count = current_solution.getCVCount();
+
+    // Calculate total duration of the current best solution
+    Duration best_total_duration = best_solution.totalDuration();
+    
+    // Count zones visited in the initial solution
+    size_t original_zones_count = best_solution.visitedZones(problem);
 
     // Create a copy of the solution's CV routes to modify
     auto routes = current_solution.getCVRoutes();
@@ -91,28 +97,27 @@ class TwoOptSearch : public CVLocalSearch {
           new_routes[route_idx] = new_route;
 
           // Check if the new solution is better
-          size_t new_cv_count = new_routes.size();
+          size_t new_cv_count = new_solution.getCVCount();
+          Duration new_total_duration = new_solution.totalDuration();
+          size_t new_zones_count = new_solution.visitedZones(problem);
 
           bool is_better = false;
 
-          // First constraint: Use at most the maximum number of allowed vehicles
-          if (best_cv_count > static_cast<size_t>(max_cv_vehicles) &&
-              new_cv_count <= static_cast<size_t>(max_cv_vehicles)) {
-            // The new solution satisfies the max vehicles constraint while the current best doesn't
-            is_better = true;
-          } else if ((best_cv_count > static_cast<size_t>(max_cv_vehicles) &&
-                      new_cv_count < best_cv_count) ||
-                     (best_cv_count <= static_cast<size_t>(max_cv_vehicles) &&
-                      new_cv_count < best_cv_count &&
-                      new_cv_count <= static_cast<size_t>(max_cv_vehicles))) {
-            // Either both violate the constraint but new uses fewer vehicles,
-            // or both satisfy the constraint and new uses fewer vehicles
-            is_better = true;
+          // Primary constraint: Don't increase the number of vehicles
+          if (new_cv_count <= original_cv_count) {
+            // Secondary constraint: Don't decrease the number of zones visited
+            if (new_zones_count >= original_zones_count) {
+              // Optimization goal: Minimize total duration when constraints are met
+              if (new_total_duration < best_total_duration) {
+                is_better = true;
+              }
+            }
           }
 
           if (is_better) {
             best_solution = new_solution;
-            best_cv_count = new_cv_count;
+            best_total_duration = new_total_duration;
+            original_zones_count = new_zones_count;
 
             if (first_improvement_) {
               return best_solution;

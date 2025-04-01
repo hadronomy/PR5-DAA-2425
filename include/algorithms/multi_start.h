@@ -42,6 +42,7 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     // Keep track of the best solution
     std::optional<VRPTSolution> best_solution;
     size_t best_cv_count = std::numeric_limits<size_t>::max();
+    double best_total_duration = std::numeric_limits<double>::max();
 
     // Perform multiple starts
     for (int i = 0; i < num_starts_; ++i) {
@@ -51,11 +52,28 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
       // Apply local search
       VRPTSolution improved_solution = local_search_->improveSolution(problem, initial_solution);
 
+      // Calculate total duration for the improved solution
+      double total_duration = improved_solution.totalDuration().value();
+
       // Check if this is the best solution so far
       size_t cv_count = improved_solution.getCVCount();
-      if (!best_solution || cv_count < best_cv_count) {
+
+      bool is_better = false;
+      if (!best_solution) {
+        // First solution found
+        is_better = true;
+      } else if (cv_count < best_cv_count) {
+        // Better primary criterion: fewer vehicles
+        is_better = true;
+      } else if (cv_count == best_cv_count && total_duration < best_total_duration) {
+        // Same number of vehicles but better secondary criterion: lower duration
+        is_better = true;
+      }
+
+      if (is_better) {
         best_solution = improved_solution;
         best_cv_count = cv_count;
+        best_total_duration = total_duration;
       }
     }
 

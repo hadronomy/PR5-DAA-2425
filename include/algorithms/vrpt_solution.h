@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -336,6 +337,36 @@ class VRPTSolution {
     });
 
     return all_tasks;
+  }
+
+  // Calculate total duration across all CV routes
+  [[nodiscard]] Duration totalDuration() const {
+    Duration total{0.0};
+    for (const auto& duration : cv_routes_ | std::views::transform(&CVRoute::totalDuration)) {
+      total = total + duration;
+    }
+    return total;
+  }
+
+  // Count unique collection zones visited across all routes
+  [[nodiscard]] size_t visitedZones(const VRPTProblem& problem) const {
+    std::unordered_set<std::string> visited_zones;
+
+    auto is_collection_zone = [&problem](const std::string& id) {
+      try {
+        return problem.getLocation(id).type() == LocationType::COLLECTION_ZONE;
+      } catch (const std::exception&) {
+        return false;
+      }
+    };
+
+    for (const auto& route : cv_routes_) {
+      for (const auto& id : route.locationIds() | std::views::filter(is_collection_zone)) {
+        visited_zones.insert(id);
+      }
+    }
+
+    return visited_zones.size();
   }
 
   // Getters

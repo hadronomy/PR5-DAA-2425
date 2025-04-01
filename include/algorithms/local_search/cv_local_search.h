@@ -1,5 +1,6 @@
 #pragma once
 
+#include <unordered_set>
 #include "algorithms/vrpt_solution.h"
 #include "imgui.h"
 #include "meta_heuristic_components.h"
@@ -37,7 +38,11 @@ class CVLocalSearch : public ::meta::LocalSearch<VRPTSolution, VRPTProblem> {
     VRPTSolution current_solution = initial_solution;
     VRPTSolution best_solution = current_solution;
     size_t best_cv_count = best_solution.getCVCount();
+    double best_total_duration = best_solution.totalDuration().value();
     int max_cv_vehicles = problem.getNumCVVehicles();
+
+    // Count zones visited in the initial solution
+    size_t best_zones_count = best_solution.visitedZones(problem);
 
     bool improved;
     int iteration = 0;
@@ -48,6 +53,8 @@ class CVLocalSearch : public ::meta::LocalSearch<VRPTSolution, VRPTProblem> {
       // Apply neighborhood search
       VRPTSolution neighbor_solution = searchNeighborhood(problem, current_solution);
       size_t neighbor_cv_count = neighbor_solution.getCVCount();
+      double neighbor_total_duration = neighbor_solution.totalDuration().value();
+      size_t neighbor_zones_count = neighbor_solution.visitedZones(problem);
 
       // Check if the neighbor is better
       bool is_better = false;
@@ -65,11 +72,24 @@ class CVLocalSearch : public ::meta::LocalSearch<VRPTSolution, VRPTProblem> {
         // Either both violate the constraint but neighbor uses fewer vehicles,
         // or both satisfy the constraint and neighbor uses fewer vehicles
         is_better = true;
+      } else if (best_cv_count == neighbor_cv_count) {
+        // Same number of vehicles, check zones count
+        if (neighbor_zones_count >= best_zones_count) {
+          // Must visit at least the same number of zones
+          if (neighbor_zones_count > best_zones_count ||
+              (neighbor_zones_count == best_zones_count &&
+               neighbor_total_duration < best_total_duration)) {
+            // Either more zones visited, or same zones with better duration
+            is_better = true;
+          }
+        }
       }
 
       if (is_better) {
         best_solution = neighbor_solution;
         best_cv_count = neighbor_cv_count;
+        best_total_duration = neighbor_total_duration;
+        best_zones_count = neighbor_zones_count;
         current_solution = neighbor_solution;
         improved = true;
       }
