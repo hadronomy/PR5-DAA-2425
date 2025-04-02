@@ -146,19 +146,27 @@ void Canvas::HandleInput(bool is_window_focused, bool is_window_hovered) {
   // Convert mouse position to canvas-relative coordinates
   Vector2 canvas_mouse_pos = {mouse_pos.x - canvas_origin.x, mouse_pos.y - canvas_origin.y};
 
+  // Check if Ctrl key is pressed (either left or right Ctrl)
+  bool ctrl_pressed = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+
   // Handle zooming with mouse wheel
   float wheel = GetMouseWheelMove();
   if (wheel != 0) {
     HandleZooming(canvas_mouse_pos);
   }
 
-  // Handle panning with middle mouse button
-  if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON)) {
+  // Handle panning with middle mouse button or Ctrl+left click
+  if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) ||
+      (ctrl_pressed && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))) {
     is_panning_ = true;
     last_mouse_pos_ = canvas_mouse_pos;
   }
 
-  if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON)) {
+  // Stop panning if middle mouse button is released or left mouse button is released while using
+  // Ctrl
+  if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON) ||
+      (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && ctrl_pressed) ||
+      (is_panning_ && !ctrl_pressed && !IsMouseButtonDown(MOUSE_MIDDLE_BUTTON))) {
     is_panning_ = false;
   }
 
@@ -169,12 +177,15 @@ void Canvas::HandleInput(bool is_window_focused, bool is_window_hovered) {
   // Transform mouse position to world space for object interaction
   Vector2 world_mouse_pos = ScreenToWorld(canvas_mouse_pos);
 
-  // Handle object interaction - no need to track if interaction occurred
-  object_manager_->HandleObjectInteraction(
-    world_mouse_pos,
-    IsMouseButtonPressed(MOUSE_LEFT_BUTTON),
-    IsMouseButtonReleased(MOUSE_LEFT_BUTTON)
-  );
+  // Handle object interaction - only when not panning with Ctrl+left click
+  if (!(ctrl_pressed &&
+        (IsMouseButtonDown(MOUSE_LEFT_BUTTON) || IsMouseButtonPressed(MOUSE_LEFT_BUTTON)))) {
+    object_manager_->HandleObjectInteraction(
+      world_mouse_pos,
+      IsMouseButtonPressed(MOUSE_LEFT_BUTTON),
+      IsMouseButtonReleased(MOUSE_LEFT_BUTTON)
+    );
+  }
 }
 
 void Canvas::Update() {
