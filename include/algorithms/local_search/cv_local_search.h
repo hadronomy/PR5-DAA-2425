@@ -35,67 +35,71 @@ class CVLocalSearch : public ::meta::LocalSearch<VRPTSolution, VRPTProblem> {
    */
   VRPTSolution improveSolution(const VRPTProblem& problem, const VRPTSolution& initial_solution)
     override {
-    VRPTSolution current_solution = initial_solution;
-    VRPTSolution best_solution = current_solution;
-    size_t best_cv_count = best_solution.getCVCount();
-    double best_total_duration = best_solution.totalDuration().value();
-    int max_cv_vehicles = problem.getNumCVVehicles();
+    auto current_solution = initial_solution;
+    auto best_solution = current_solution;
 
-    // Count zones visited in the initial solution
-    size_t best_zones_count = best_solution.visitedZones(problem);
+    // Store solution metrics for comparison
+    struct SolutionMetrics {
+      size_t cv_count;
+      size_t zones_count;
+      double total_duration;
+    };
 
-    bool improved;
-    int iteration = 0;
+    auto getSolutionMetrics = [&problem](const VRPTSolution& solution) -> SolutionMetrics {
+      return {
+        .cv_count = solution.getCVCount(),
+        .zones_count = solution.visitedZones(problem),
+        .total_duration = solution.totalDuration().value()
+      };
+    };
 
-    do {
-      improved = false;
+    const auto max_cv_vehicles = problem.getNumCVVehicles();
+    auto best_metrics = getSolutionMetrics(best_solution);
 
-      // Apply neighborhood search
-      VRPTSolution neighbor_solution = searchNeighborhood(problem, current_solution);
-      size_t neighbor_cv_count = neighbor_solution.getCVCount();
-      double neighbor_total_duration = neighbor_solution.totalDuration().value();
-      size_t neighbor_zones_count = neighbor_solution.visitedZones(problem);
-
-      // Check if the neighbor is better
-      bool is_better = false;
-
+    auto is_better_solution =
+      [max_cv_vehicles](const SolutionMetrics& current, const SolutionMetrics& candidate) -> bool {
       // First constraint: Use at most the maximum number of allowed vehicles
-      if (best_cv_count > static_cast<size_t>(max_cv_vehicles) &&
-          neighbor_cv_count <= static_cast<size_t>(max_cv_vehicles)) {
-        // The new solution satisfies the max vehicles constraint while the current best doesn't
-        is_better = true;
-      } else if ((best_cv_count > static_cast<size_t>(max_cv_vehicles) &&
-                  neighbor_cv_count < best_cv_count) ||
-                 (best_cv_count <= static_cast<size_t>(max_cv_vehicles) &&
-                  neighbor_cv_count < best_cv_count &&
-                  neighbor_cv_count <= static_cast<size_t>(max_cv_vehicles))) {
-        // Either both violate the constraint but neighbor uses fewer vehicles,
-        // or both satisfy the constraint and neighbor uses fewer vehicles
-        is_better = true;
-      } else if (best_cv_count == neighbor_cv_count) {
+      if (current.cv_count > static_cast<size_t>(max_cv_vehicles) &&
+          candidate.cv_count <= static_cast<size_t>(max_cv_vehicles)) {
+        return true;  // Candidate satisfies vehicle constraint while current doesn't
+      }
+
+      if ((current.cv_count > static_cast<size_t>(max_cv_vehicles) &&
+           candidate.cv_count < current.cv_count) ||
+          (current.cv_count <= static_cast<size_t>(max_cv_vehicles) &&
+           candidate.cv_count < current.cv_count &&
+           candidate.cv_count <= static_cast<size_t>(max_cv_vehicles))) {
+        return true;  // Fewer vehicles while respecting constraints
+      }
+
+      if (current.cv_count == candidate.cv_count) {
         // Same number of vehicles, check zones count
-        if (neighbor_zones_count >= best_zones_count) {
-          // Must visit at least the same number of zones
-          if (neighbor_zones_count > best_zones_count ||
-              (neighbor_zones_count == best_zones_count &&
-               neighbor_total_duration < best_total_duration)) {
-            // Either more zones visited, or same zones with better duration
-            is_better = true;
-          }
+        if (candidate.zones_count > current.zones_count) {
+          return true;  // More zones visited
+        }
+
+        if (candidate.zones_count == current.zones_count &&
+            candidate.total_duration < current.total_duration) {
+          return true;  // Same zones with better duration
         }
       }
 
-      if (is_better) {
-        best_solution = neighbor_solution;
-        best_cv_count = neighbor_cv_count;
-        best_total_duration = neighbor_total_duration;
-        best_zones_count = neighbor_zones_count;
-        current_solution = neighbor_solution;
-        improved = true;
-      }
+      return false;
+    };
 
-      iteration++;
-    } while (improved && iteration < max_iterations_);
+    for (int iteration = 0; iteration < max_iterations_; ++iteration) {
+      auto neighbor_solution = searchNeighborhood(problem, current_solution);
+      auto neighbor_metrics = getSolutionMetrics(neighbor_solution);
+
+      if (is_better_solution(best_metrics, neighbor_metrics)) {
+        best_solution = neighbor_solution;
+        best_metrics = neighbor_metrics;
+        current_solution = std::move(neighbor_solution);
+      } else {
+        // No improvement found
+        break;
+      }
+    }
 
     return best_solution;
   }

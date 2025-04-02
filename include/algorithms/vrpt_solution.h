@@ -25,6 +25,19 @@ class DeliveryTask {
   [[nodiscard]] const std::string& swtsId() const { return swts_id_; }
   [[nodiscard]] const Duration& arrivalTime() const { return arrival_time_; }
 
+  /**
+   * @brief Equality operator
+   */
+  bool operator==(const DeliveryTask& other) const {
+    return amount_ == other.amount_ && swts_id_ == other.swts_id_ &&
+           arrival_time_ == other.arrival_time_;
+  }
+
+  /**
+   * @brief Inequality operator
+   */
+  bool operator!=(const DeliveryTask& other) const { return !(*this == other); }
+
  private:
   Capacity amount_;        // Amount of waste delivered
   std::string swts_id_;    // SWTS location ID
@@ -155,6 +168,24 @@ class CVRoute {
 
   // Calculate the residual time (how much time is left)
   [[nodiscard]] Duration residualTime() const { return max_duration_ - total_duration_; }
+
+  /**
+   * @brief Equality operator
+   * @param other The route to compare with
+   * @return True if the routes are identical
+   */
+  bool operator==(const CVRoute& other) const {
+    return vehicle_id_ == other.vehicle_id_ && location_ids_ == other.location_ids_ &&
+           current_load_ == other.current_load_ && total_duration_ == other.total_duration_ &&
+           deliveries_ == other.deliveries_;
+  }
+
+  /**
+   * @brief Inequality operator
+   * @param other The route to compare with
+   * @return True if the routes are different
+   */
+  bool operator!=(const CVRoute& other) const { return !(*this == other); }
 
  private:
   std::vector<std::string> location_ids_;   // Sequence of location IDs (zones, SWTS, depot)
@@ -299,6 +330,24 @@ class TVRoute {
            (location_ids_.empty() || location_ids_.back() == problem.getLandfill().id());
   }
 
+  /**
+   * @brief Equality operator
+   * @param other The route to compare with
+   * @return True if the routes are identical
+   */
+  bool operator==(const TVRoute& other) const {
+    return vehicle_id_ == other.vehicle_id_ && location_ids_ == other.location_ids_ &&
+           current_load_ == other.current_load_ && current_time_ == other.current_time_ &&
+           pickups_ == other.pickups_;
+  }
+
+  /**
+   * @brief Inequality operator
+   * @param other The route to compare with
+   * @return True if the routes are different
+   */
+  bool operator!=(const TVRoute& other) const { return !(*this == other); }
+
  private:
   std::vector<std::string> location_ids_;  // Sequence of location IDs (SWTS, landfill)
   std::string vehicle_id_;                 // Vehicle ID
@@ -418,6 +467,32 @@ class VRPTSolution {
 
     return true;
   }
+
+  /**
+   * @brief Equality operator
+   * @param other The solution to compare with
+   * @return True if the solutions are identical
+   */
+  bool operator==(const VRPTSolution& other) const {
+    // Compare CV routes - this is the main solution representation
+    if (getCVRoutes() != other.getCVRoutes()) {
+      return false;
+    }
+
+    // Compare UAV routes if present in the solution
+    if (getTVRoutes() != other.getTVRoutes()) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * @brief Inequality operator
+   * @param other The solution to compare with
+   * @return True if the solutions are different
+   */
+  bool operator!=(const VRPTSolution& other) const { return !(*this == other); }
 
  private:
   std::vector<CVRoute> cv_routes_;  // Collection vehicle routes

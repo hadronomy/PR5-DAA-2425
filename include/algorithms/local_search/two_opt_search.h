@@ -1,8 +1,10 @@
 #pragma once
 
+#include <algorithm>
+#include <concepts>
+#include <ranges>
 #include <string>
 #include <vector>
-#include <unordered_set>
 
 #include "algorithm_registry.h"
 #include "algorithms/local_search/cv_local_search.h"
@@ -39,91 +41,70 @@ class TwoOptSearch : public CVLocalSearch {
 
     // Calculate total duration of the current best solution
     Duration best_total_duration = best_solution.totalDuration();
-    
+
     // Count zones visited in the initial solution
     size_t original_zones_count = best_solution.visitedZones(problem);
 
-    // Create a copy of the solution's CV routes to modify
-    auto routes = current_solution.getCVRoutes();
-
     // Apply 2-opt to each route
-    for (size_t route_idx = 0; route_idx < routes.size(); ++route_idx) {
-      const auto& route = routes[route_idx];
+    for (size_t route_idx = 0; route_idx < current_solution.getCVRoutes().size(); ++route_idx) {
+      const auto& route = current_solution.getCVRoutes()[route_idx];
       const auto& locations = route.locationIds();
 
       // Need at least 4 locations for 2-opt to make sense
-      if (locations.size() < 4) {
+      if (locations.size() < 4)
         continue;
-      }
 
-      // Try each possible 2-opt swap
-      for (size_t i = 0; i < locations.size() - 2; ++i) {
-        for (size_t j = i + 2; j < locations.size(); ++j) {
-          // Create a new solution with the 2-opt swap
-          VRPTSolution new_solution = current_solution;
-          auto& new_routes = new_solution.getCVRoutes();
+      // Use the helper function to iterate through all valid 2-opt swap pairs
+      forEach2OptPair(locations.size(), [&](size_t i, size_t j) {
+        // Create a new solution with the 2-opt swap
+        VRPTSolution new_solution = current_solution;
+        auto& new_routes = new_solution.getCVRoutes();
 
-          // Create new route with the segment reversed
-          std::vector<std::string> new_locations;
+        // Create the new sequence with the reversed segment using std::reverse
+        std::vector<std::string> new_locations(locations);
+        std::reverse(new_locations.begin() + i + 1, new_locations.begin() + j + 1);
 
-          // Add locations before the reversed segment
-          for (size_t k = 0; k <= i; ++k) {
-            new_locations.push_back(locations[k]);
-          }
+        // Rebuild the route with the new sequence
+        CVRoute new_route(route.vehicleId(), problem.getCVCapacity(), problem.getCVMaxDuration());
 
-          // Add reversed segment
-          for (size_t k = j; k > i; --k) {
-            new_locations.push_back(locations[k]);
-          }
-
-          // Add locations after the reversed segment
-          for (size_t k = j + 1; k < locations.size(); ++k) {
-            new_locations.push_back(locations[k]);
-          }
-
-          // Rebuild the route with the new sequence
-          Capacity cv_capacity = problem.getCVCapacity();
-          Duration cv_max_duration = problem.getCVMaxDuration();
-
-          CVRoute new_route(route.vehicleId(), cv_capacity, cv_max_duration);
-          for (const auto& loc_id : new_locations) {
-            if (!new_route.canVisit(loc_id, problem)) {
-              continue;
-            }
+        for (const auto& loc_id : new_locations) {
+          if (new_route.canVisit(loc_id, problem)) {
             new_route.addLocation(loc_id, problem);
           }
+        }
 
-          // Update the route
-          new_routes[route_idx] = new_route;
+        // Only proceed if the new route is valid:
+        // 1. Final load must be 0 (all waste delivered)
+        // 2. Route must end at depot
+        if (new_route.currentLoad().value() != 0.0 ||
+            (new_route.lastLocationId() != problem.getDepot().id())) {
+          return;  // Skip invalid routes
+        }
 
-          // Check if the new solution is better
-          size_t new_cv_count = new_solution.getCVCount();
-          Duration new_total_duration = new_solution.totalDuration();
-          size_t new_zones_count = new_solution.visitedZones(problem);
+        // Update the route
+        new_routes[route_idx] = new_route;
 
-          bool is_better = false;
+        // Check if the new solution is better
+        size_t new_cv_count = new_solution.getCVCount();
+        Duration new_total_duration = new_solution.totalDuration();
+        size_t new_zones_count = new_solution.visitedZones(problem);
 
-          // Primary constraint: Don't increase the number of vehicles
-          if (new_cv_count <= original_cv_count) {
-            // Secondary constraint: Don't decrease the number of zones visited
-            if (new_zones_count >= original_zones_count) {
-              // Optimization goal: Minimize total duration when constraints are met
-              if (new_total_duration < best_total_duration) {
-                is_better = true;
-              }
-            }
-          }
+        // Check if solution is better (with simplified evaluation logic)
+        if (new_cv_count <= original_cv_count && new_zones_count >= original_zones_count &&
+            new_total_duration < best_total_duration) {
+          best_solution = new_solution;
+          best_total_duration = new_total_duration;
+          original_zones_count = new_zones_count;
 
-          if (is_better) {
-            best_solution = new_solution;
-            best_total_duration = new_total_duration;
-            original_zones_count = new_zones_count;
-
-            if (first_improvement_) {
-              return best_solution;
-            }
+          if (first_improvement_) {
+            return;  // Early return from lambda to exit the search
           }
         }
+      });
+
+      // If first_improvement_ and we found an improvement, the lambda would have returned
+      if (first_improvement_ && best_solution != current_solution) {
+        break;
       }
     }
 
@@ -131,6 +112,24 @@ class TwoOptSearch : public CVLocalSearch {
   }
 
   std::string name() const override { return "2-Opt Search"; }
+
+ private:
+  /**
+   * @brief Iterates through all valid 2-opt swap index pairs using C++20 ranges
+   * @param size The size of the route
+   * @param callback Function to call for each valid (i,j) pair
+   */
+  template <typename Callback>
+  requires std::invocable<Callback, size_t, size_t> void
+    forEach2OptPair(size_t size, Callback callback) {
+    // Generate all index pairs (i,j) where i < j-1 (non-adjacent)
+    auto indices = std::views::iota(0u, size);
+    for (const auto i : indices | std::views::take(size - 2)) {
+      for (const auto j : std::views::iota(i + 2, size)) {
+        callback(i, j);
+      }
+    }
+  }
 };
 
 namespace {
