@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <numeric>
 #include <random>
 #include <string>
 #include <unordered_map>
@@ -73,9 +74,16 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     // Main GVNS loop
     int iteration = 0;
     while (iteration < max_iterations_) {
-      // Variable neighborhood descent (VND)
-      size_t k = 0;
-      while (k < neighborhoods_.size()) {
+      // Random Variable Neighborhood Descent (RVND)
+      std::vector<size_t> available_neighborhoods(neighborhoods_.size());
+      std::iota(available_neighborhoods.begin(), available_neighborhoods.end(), 0);
+
+      while (!available_neighborhoods.empty()) {
+        // Randomly select neighborhood
+        std::uniform_int_distribution<size_t> dist(0, available_neighborhoods.size() - 1);
+        size_t idx = dist(gen);
+        size_t k = available_neighborhoods[idx];
+
         // Apply current neighborhood search
         VRPTSolution improved_solution =
           neighborhoods_[k]->improveSolution(problem, current_solution);
@@ -103,12 +111,13 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
         }
 
         if (is_better) {
-          // Improvement found, restart with first neighborhood
+          // Improvement found, reset available neighborhoods
           current_solution = improved_solution;
-          k = 0;
+          available_neighborhoods.resize(neighborhoods_.size());
+          std::iota(available_neighborhoods.begin(), available_neighborhoods.end(), 0);
         } else {
-          // No improvement, move to next neighborhood
-          k++;
+          // No improvement, remove this neighborhood from consideration
+          available_neighborhoods.erase(available_neighborhoods.begin() + idx);
         }
       }
 

@@ -25,7 +25,7 @@ class VRPTSolver : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
    * @param tv_algorithm The algorithm to use for TV routing (Phase 2)
    */
   VRPTSolver(
-    std::string cv_algorithm = "MultiStart",
+    std::string cv_algorithm = "MultiStart-RVND",
     std::string tv_algorithm = "GreedyTVScheduler"
   )
       : cv_algorithm_name_(std::move(cv_algorithm)), tv_algorithm_name_(std::move(tv_algorithm)) {
