@@ -60,7 +60,11 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     // Generate initial solution
     VRPTSolution current_solution = generator_->generateSolution(problem);
     VRPTSolution best_solution = current_solution;
+
+    // Track metrics for evaluating solutions
     size_t best_cv_count = best_solution.getCVCount();
+    size_t best_zones_count = best_solution.visitedZones(problem);
+    Duration best_total_duration = best_solution.totalDuration();
 
     // Random number generator
     std::random_device rd;
@@ -76,9 +80,29 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
         VRPTSolution improved_solution =
           neighborhoods_[k]->improveSolution(problem, current_solution);
 
-        // Check if solution improved
+        // Check if solution improved using all criteria
         size_t improved_cv_count = improved_solution.getCVCount();
+        size_t improved_zones_count = improved_solution.visitedZones(problem);
+        Duration improved_total_duration = improved_solution.totalDuration();
+
+        bool is_better = false;
+
+        // Solution is better if:
+        // 1. It uses fewer vehicles, OR
+        // 2. It uses same number of vehicles but visits more zones, OR
+        // 3. It uses same vehicles, visits same zones, but has shorter duration
         if (improved_cv_count < current_solution.getCVCount()) {
+          is_better = true;
+        } else if (improved_cv_count == current_solution.getCVCount()) {
+          if (improved_zones_count > current_solution.visitedZones(problem)) {
+            is_better = true;
+          } else if (improved_zones_count == current_solution.visitedZones(problem) &&
+                     improved_total_duration < current_solution.totalDuration()) {
+            is_better = true;
+          }
+        }
+
+        if (is_better) {
           // Improvement found, restart with first neighborhood
           current_solution = improved_solution;
           k = 0;
@@ -88,10 +112,29 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
         }
       }
 
-      // Check if we found a new best solution
-      if (current_solution.getCVCount() < best_cv_count) {
+      // Check if we found a new best solution using all criteria
+      size_t current_cv_count = current_solution.getCVCount();
+      size_t current_zones_count = current_solution.visitedZones(problem);
+      Duration current_total_duration = current_solution.totalDuration();
+
+      bool is_new_best = false;
+
+      if (current_cv_count < best_cv_count) {
+        is_new_best = true;
+      } else if (current_cv_count == best_cv_count) {
+        if (current_zones_count > best_zones_count) {
+          is_new_best = true;
+        } else if (current_zones_count == best_zones_count &&
+                   current_total_duration < best_total_duration) {
+          is_new_best = true;
+        }
+      }
+
+      if (is_new_best) {
         best_solution = current_solution;
-        best_cv_count = current_solution.getCVCount();
+        best_cv_count = current_cv_count;
+        best_zones_count = current_zones_count;
+        best_total_duration = current_total_duration;
       }
 
       // Shaking - perturb the current solution
@@ -192,12 +235,22 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
       new_r1.addLocation(loc_id, problem);
     }
 
+    // Check if the first route ends at depot and has 0 load
+    if (new_r1.currentLoad().value() != 0.0 || new_r1.lastLocationId() != problem.getDepot().id()) {
+      return solution;  // Return original solution if invalid
+    }
+
     CVRoute new_r2(routes[r2_idx].vehicleId(), cv_capacity, cv_max_duration);
     for (const auto& loc_id : new_r2_locs) {
       if (!new_r2.canVisit(loc_id, problem)) {
         return solution;
       }
       new_r2.addLocation(loc_id, problem);
+    }
+
+    // Check if the second route ends at depot and has 0 load
+    if (new_r2.currentLoad().value() != 0.0 || new_r2.lastLocationId() != problem.getDepot().id()) {
+      return solution;  // Return original solution if invalid
     }
 
     // Update routes
