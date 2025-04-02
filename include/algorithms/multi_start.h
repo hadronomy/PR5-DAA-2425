@@ -1,9 +1,12 @@
 #pragma once
 
+#include <latch>
 #include <memory>
+#include <mutex>
 #include <numeric>
 #include <random>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -53,97 +56,120 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
       }
     }
 
-    // Keep track of the best solution
+    // Use a thread-safe container for collecting solutions
+    std::mutex solutions_mutex;
     std::optional<VRPTSolution> best_solution;
     size_t best_cv_count = std::numeric_limits<size_t>::max();
     double best_total_duration = std::numeric_limits<double>::max();
 
-    // Random number generator for RVND
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    // Create a thread pool
+    const unsigned int thread_count = std::thread::hardware_concurrency();
+    std::vector<std::jthread> threads;
+    std::latch completion_latch(num_starts_);
 
-    // Perform multiple starts
-    for (int i = 0; i < num_starts_; ++i) {
-      // Generate an initial solution
-      VRPTSolution current_solution = generator_->generateSolution(problem);
+    // Split work among threads
+    for (int thread_id = 0;
+         thread_id < std::min(thread_count, static_cast<unsigned int>(num_starts_));
+         ++thread_id) {
+      threads.emplace_back([&, thread_id]() {
+        std::random_device rd;
+        std::mt19937 gen(rd());
 
-      // Apply Random VND if we have multiple neighborhoods
-      if (!local_searches_.empty()) {
-        bool improved = true;
+        // Calculate start and end indices for this thread
+        int starts_per_thread = num_starts_ / thread_count;
+        int start_idx = thread_id * starts_per_thread;
+        int end_idx =
+          (thread_id == thread_count - 1) ? num_starts_ : (thread_id + 1) * starts_per_thread;
 
-        while (improved) {
-          improved = false;
+        // Process assigned starts
+        for (int i = start_idx; i < end_idx; ++i) {
+          // Create thread-local copies of solution generator and searches
+          auto thread_generator = MetaFactory::createGenerator(generator_name_);
 
-          // Create list of available neighborhoods
-          std::vector<size_t> available_searches(local_searches_.size());
-          std::iota(available_searches.begin(), available_searches.end(), 0);
+          std::vector<std::unique_ptr<::meta::LocalSearch<VRPTSolution, VRPTProblem>>>
+            thread_searches;
+          for (const auto& name : search_names_) {
+            thread_searches.push_back(MetaFactory::createSearch(name));
+          }
 
-          // Try neighborhoods in random order until no improvement
-          while (!available_searches.empty() && !improved) {
-            // Randomly select a neighborhood
-            std::uniform_int_distribution<size_t> dist(0, available_searches.size() - 1);
-            size_t idx = dist(gen);
-            size_t search_idx = available_searches[idx];
+          // Generate an initial solution
+          VRPTSolution current_solution = thread_generator->generateSolution(problem);
 
-            // Apply the selected neighborhood search
-            VRPTSolution candidate_solution =
-              local_searches_[search_idx]->improveSolution(problem, current_solution);
+          // Apply Random VND
+          if (!thread_searches.empty()) {
+            bool improved = true;
 
-            // Check if solution improved
-            size_t candidate_cv_count = candidate_solution.getCVCount();
-            double candidate_duration = candidate_solution.totalDuration().value();
+            while (improved) {
+              improved = false;
+
+              // Create list of available neighborhoods
+              std::vector<size_t> available_searches(thread_searches.size());
+              std::iota(available_searches.begin(), available_searches.end(), 0);
+
+              while (!available_searches.empty() && !improved) {
+                // Randomly select neighborhood
+                std::uniform_int_distribution<size_t> dist(0, available_searches.size() - 1);
+                size_t idx = dist(gen);
+                size_t search_idx = available_searches[idx];
+
+                // Apply search
+                VRPTSolution candidate =
+                  thread_searches[search_idx]->improveSolution(problem, current_solution);
+
+                // Check improvement
+                size_t candidate_cv_count = candidate.getCVCount();
+                double candidate_duration = candidate.totalDuration().value();
+
+                bool is_better = false;
+                if (candidate_cv_count < current_solution.getCVCount()) {
+                  is_better = true;
+                } else if (candidate_cv_count == current_solution.getCVCount() &&
+                           candidate_duration < current_solution.totalDuration().value()) {
+                  is_better = true;
+                }
+
+                if (is_better) {
+                  current_solution = candidate;
+                  improved = true;
+                } else {
+                  available_searches.erase(available_searches.begin() + idx);
+                }
+              }
+            }
+          }
+
+          // Thread-safe update of best solution
+          {
+            std::lock_guard<std::mutex> lock(solutions_mutex);
+
+            double total_duration = current_solution.totalDuration().value();
+            size_t cv_count = current_solution.getCVCount();
 
             bool is_better = false;
-            if (candidate_cv_count < current_solution.getCVCount()) {
+            if (!best_solution) {
               is_better = true;
-            } else if (candidate_cv_count == current_solution.getCVCount() &&
-                       candidate_duration < current_solution.totalDuration().value()) {
+            } else if (cv_count < best_cv_count) {
+              is_better = true;
+            } else if (cv_count == best_cv_count && total_duration < best_total_duration) {
               is_better = true;
             }
 
             if (is_better) {
-              // Accept improvement
-              current_solution = candidate_solution;
-              improved = true;
-            } else {
-              // Remove this neighborhood from consideration
-              available_searches.erase(available_searches.begin() + idx);
+              best_solution = current_solution;
+              best_cv_count = cv_count;
+              best_total_duration = total_duration;
             }
           }
+
+          // Count this start as completed
+          completion_latch.count_down();
         }
-      } else if (!search_names_.empty()) {
-        // Fallback to single local search if neighborhoods couldn't be created
-        try {
-          auto single_search = MetaFactory::createSearch(search_names_[0]);
-          current_solution = single_search->improveSolution(problem, current_solution);
-        } catch (const std::exception&) {
-          // Continue with unimproved solution
-        }
-      }
-
-      // Calculate total duration for the improved solution
-      double total_duration = current_solution.totalDuration().value();
-      size_t cv_count = current_solution.getCVCount();
-
-      // Check if this is the best solution so far
-      bool is_better = false;
-      if (!best_solution) {
-        // First solution found
-        is_better = true;
-      } else if (cv_count < best_cv_count) {
-        // Better primary criterion: fewer vehicles
-        is_better = true;
-      } else if (cv_count == best_cv_count && total_duration < best_total_duration) {
-        // Same number of vehicles but better secondary criterion: lower duration
-        is_better = true;
-      }
-
-      if (is_better) {
-        best_solution = current_solution;
-        best_cv_count = cv_count;
-        best_total_duration = total_duration;
-      }
+      });
     }
+
+    // Wait for all starts to complete
+    completion_latch.wait();
+    // jthreads will automatically join when they go out of scope
 
     return best_solution.value_or(generator_->generateSolution(problem));
   }

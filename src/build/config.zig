@@ -16,6 +16,7 @@ pub const cppflags = [_][]const u8{
     "-std=c++23",
     "-Wall",
     "-Wextra",
+    "-fexperimental-library",
     // "-Werror",
     "-Wpedantic",
     "-Wno-deprecated-declarations",
