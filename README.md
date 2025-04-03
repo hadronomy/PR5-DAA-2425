@@ -9,7 +9,7 @@
       src="https://img.shields.io/badge/ULL-5C068C?style=for-the-badge&logo=gitbook&labelColor=302D41"
     />
   </a>
-  <a href="https://github.com/hadronomy/PR3-DAA-2425/blob/main/LICENSE">
+  <a href="https://github.com/hadronomy/PR5-DAA-2425/blob/main/LICENSE">
     <img
       alt="License"
       src="https://img.shields.io/badge/MIT-EE999F?style=for-the-badge&logo=starship&label=LICENSE&labelColor=302D41"
@@ -27,7 +27,7 @@
 
 ## Docs
 
-See the [docs](/docs/assignment.pdf) pdf for more information.
+This project implements algorithms for the Vehicle Routing Problem with Transshipments for Solid Waste Collection with Transfer Stations (VRPT-SWTS). See the [docs](/docs/P5_DAA_VRPT_2024_2025.pdf) pdf for more information about the assignment and [summary](/docs/summary.md) for a detailed problem description.
 
 ## Requirements
 
@@ -65,42 +65,45 @@ just run --help
 - `bench <algorithm> [options]` - Benchmark a specific algorithm
 - `compare <algorithm1> <algorithm2> [options]` - Compare multiple algorithms
 - `list` - List available algorithms
-- `help` - Show help message
+- `validate <file>` - Validate a solution file
+- `visualize <file>` - Visualize a problem instance
 
 ### Options
 
 - `--iteration=N` - Number of iterations
-- `--size=N` - Size(s) of test data (can specify multiple)
-- `--file=path` - Input file(s) with graphs to benchmark (can specify multiple)
+- `--file=path` - Input file(s) with problem instances (can specify multiple)
 - `--debug` - Enable debug mode output
 - `--time-limit=path` - Time limit per algorithm run (e.g '30s', '1m30', '1h', or milliseconds)
 
 ### Examples
 
 ```bash
-# Benchmark brute force timeout
-tsp bench brute_force -N 1,5,10,15
+# Benchmark greedy CV generator algorithm
+tsp bench greedy_cv_generator -f examples/instance1.txt
 
-# Benchmark dynamic programming with a file
-tsp bench dynamic_programming -f examples/4.txt
+# Benchmark GRASP CV generator algorithm
+tsp bench grasp_cv_generator -f examples/instance2.txt
 
-# Benchmark simulated annealing 
-tsp bench simulated_annealing -N 1,5,10,15 
+# Benchmark multi-start algorithm
+tsp bench multi_start -f examples/instance3.txt
 
-# Compare nearest neighbor and two_opt
-tsp compare nearest_neighbor two_opt -N 1,5,10,15
+# Benchmark GVNS algorithm
+tsp bench gvns -f examples/instance4.txt
 
-# Compare all the algorithms and do their benchmarks
-tsp compare all -N 1,5,10,15
+# Compare greedy CV generator and GRASP CV generator
+tsp compare greedy_cv_generator grasp_cv_generator -f examples/instance5.txt
+
+# Compare all the algorithms
+tsp compare all -f examples/instance1.txt
 
 # List all the available algorithms
 tsp list
 
-# Get help information
-tsp help
+# Visualize a problem instance
+tsp visualize examples/instance1.txt
 
 # Enable debug mode
-tsp bench nearest_neighbor -N 1,5,10,15 --debug
+tsp bench greedy_cv_generator -f examples/instance1.txt --debug
 ```
 
 ## License
