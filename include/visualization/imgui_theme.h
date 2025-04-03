@@ -36,6 +36,7 @@ class FontManager {
 
   bool Initialize();
   bool LoadFont(const std::string& name, const std::string& path, float size);
+  bool LoadFontWithIcons(const std::string& name, const std::string& path, float size);
   void SetCurrentFont(const std::string& fontName);
   ImFont* GetFont(const std::string& fontName) const;
   bool IsInitialized() const { return initialized; }
@@ -67,6 +68,7 @@ class ImGuiThemeManager {
   void SetFont(const std::string& fontName);
   void SetDefaultFont(float size = 16.0f);
   ImFont* GetFont(const std::string& fontName) const;
+  bool LoadFontWithIcons(const std::string& name, const std::string& path, float size = 16.0f);
 
  private:
   // Private constructor for singleton

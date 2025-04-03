@@ -53,92 +53,79 @@ void ComfortableDarkCyanTheme::Apply() const {
   style.ButtonTextAlign = ImVec2(0.5f, 0.5f);
   style.SelectableTextAlign = ImVec2(0.0f, 0.0f);
 
-  // Define gray accent colors instead of cyan
-  ImVec4 lightGray = ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
-  ImVec4 mediumGray = ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
-  ImVec4 darkGray = ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
+  // Define a more refined color palette with darker hover/active states
+  ImVec4 lightGray = ImVec4(0.75f, 0.75f, 0.75f, 1.0f);   // Slightly dimmer
+  ImVec4 mediumGray = ImVec4(0.45f, 0.45f, 0.45f, 1.0f);  // Slightly darker
+  ImVec4 darkGray = ImVec4(0.12f, 0.14f, 0.15f, 1.0f);    // Base dark color
+
+  // New colors for hover and active states
+  ImVec4 hoverColor = ImVec4(0.16f, 0.18f, 0.22f, 1.0f);    // Slightly lighter than base
+  ImVec4 activeColor = ImVec4(0.20f, 0.22f, 0.27f, 1.0f);   // Even lighter for active state
+  ImVec4 veryDarkGray = ImVec4(0.08f, 0.09f, 0.10f, 1.0f);  // Very dark for backgrounds
 
   // Colors remain the same except blue/cyan accents which we replace with gray tones
   style.Colors[ImGuiCol_Text] = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
   style.Colors[ImGuiCol_TextDisabled] =
     ImVec4(0.2745098173618317f, 0.3176470696926117f, 0.4509803950786591f, 1.0f);
-  style.Colors[ImGuiCol_WindowBg] =
-    ImVec4(0.0784313753247261f, 0.08627451211214066f, 0.1019607856869698f, 1.0f);
+  style.Colors[ImGuiCol_WindowBg] = veryDarkGray;
   style.Colors[ImGuiCol_ChildBg] =
-    ImVec4(0.09411764889955521f, 0.1019607856869698f, 0.1176470592617989f, 1.0f);
-  style.Colors[ImGuiCol_PopupBg] =
-    ImVec4(0.0784313753247261f, 0.08627451211214066f, 0.1019607856869698f, 1.0f);
+    ImVec4(0.10f, 0.11f, 0.12f, 1.0f);  // Slightly lighter than window bg
+  style.Colors[ImGuiCol_PopupBg] = veryDarkGray;
   style.Colors[ImGuiCol_Border] =
     ImVec4(0.1568627506494522f, 0.168627455830574f, 0.1921568661928177f, 1.0f);
   style.Colors[ImGuiCol_BorderShadow] =
     ImVec4(0.0784313753247261f, 0.08627451211214066f, 0.1019607856869698f, 1.0f);
   style.Colors[ImGuiCol_FrameBg] =
     ImVec4(0.1137254908680916f, 0.125490203499794f, 0.1529411822557449f, 1.0f);
-  style.Colors[ImGuiCol_FrameBgHovered] =
-    ImVec4(0.1568627506494522f, 0.168627455830574f, 0.1921568661928177f, 1.0f);
-  style.Colors[ImGuiCol_FrameBgActive] =
-    ImVec4(0.1568627506494522f, 0.168627455830574f, 0.1921568661928177f, 1.0f);
-  style.Colors[ImGuiCol_TitleBg] =
-    ImVec4(0.0470588244497776f, 0.05490196123719215f, 0.07058823853731155f, 1.0f);
-  style.Colors[ImGuiCol_TitleBgActive] =
-    ImVec4(0.0470588244497776f, 0.05490196123719215f, 0.07058823853731155f, 1.0f);
-  style.Colors[ImGuiCol_TitleBgCollapsed] =
-    ImVec4(0.0784313753247261f, 0.08627451211214066f, 0.1019607856869698f, 1.0f);
+  style.Colors[ImGuiCol_FrameBgHovered] = hoverColor;
+  style.Colors[ImGuiCol_FrameBgActive] = activeColor;
+  style.Colors[ImGuiCol_TitleBg] = ImVec4(0.05f, 0.06f, 0.07f, 1.0f);  // Very dark title bar
+  style.Colors[ImGuiCol_TitleBgActive] = darkGray;  // Slightly lighter when active
+  style.Colors[ImGuiCol_TitleBgCollapsed] = veryDarkGray;
   style.Colors[ImGuiCol_MenuBarBg] =
     ImVec4(0.09803921729326248f, 0.105882354080677f, 0.1215686276555061f, 1.0f);
   style.Colors[ImGuiCol_ScrollbarBg] =
     ImVec4(0.0470588244497776f, 0.05490196123719215f, 0.07058823853731155f, 1.0f);
-  style.Colors[ImGuiCol_ScrollbarGrab] =
-    ImVec4(0.1176470592617989f, 0.1333333402872086f, 0.1490196138620377f, 1.0f);
-  style.Colors[ImGuiCol_ScrollbarGrabHovered] =
-    ImVec4(0.1568627506494522f, 0.168627455830574f, 0.1921568661928177f, 1.0f);
-  style.Colors[ImGuiCol_ScrollbarGrabActive] =
-    ImVec4(0.1176470592617989f, 0.1333333402872086f, 0.1490196138620377f, 1.0f);
+  style.Colors[ImGuiCol_ScrollbarGrab] = darkGray;
+  style.Colors[ImGuiCol_ScrollbarGrabHovered] = hoverColor;
+  style.Colors[ImGuiCol_ScrollbarGrabActive] = activeColor;
   style.Colors[ImGuiCol_CheckMark] = lightGray;
   style.Colors[ImGuiCol_SliderGrab] = mediumGray;
   style.Colors[ImGuiCol_SliderGrabActive] = lightGray;
-  style.Colors[ImGuiCol_Button] =
-    ImVec4(0.1176470592617989f, 0.1333333402872086f, 0.1490196138620377f, 1.0f);
-  style.Colors[ImGuiCol_ButtonHovered] =
-    ImVec4(0.1803921610116959f, 0.1882352977991104f, 0.196078434586525f, 1.0f);
-  style.Colors[ImGuiCol_ButtonActive] =
-    ImVec4(0.1529411822557449f, 0.1529411822557449f, 0.1529411822557449f, 1.0f);
+  style.Colors[ImGuiCol_Button] = darkGray;
+  style.Colors[ImGuiCol_ButtonHovered] = hoverColor;
+  style.Colors[ImGuiCol_ButtonActive] = activeColor;
   style.Colors[ImGuiCol_Header] = darkGray;
-  style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.35f, 0.35f, 0.35f, 1.0f);
-  style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.4f, 0.4f, 0.4f, 1.0f);
+  style.Colors[ImGuiCol_HeaderHovered] = hoverColor;
+  style.Colors[ImGuiCol_HeaderActive] = activeColor;
   style.Colors[ImGuiCol_Separator] =
     ImVec4(0.1294117718935013f, 0.1490196138620377f, 0.1921568661928177f, 1.0f);
-  style.Colors[ImGuiCol_SeparatorHovered] =
-    ImVec4(0.1568627506494522f, 0.1843137294054031f, 0.250980406999588f, 1.0f);
-  style.Colors[ImGuiCol_SeparatorActive] =
-    ImVec4(0.1568627506494522f, 0.1843137294054031f, 0.250980406999588f, 1.0f);
+  style.Colors[ImGuiCol_SeparatorHovered] = hoverColor;
+  style.Colors[ImGuiCol_SeparatorActive] = activeColor;
   style.Colors[ImGuiCol_ResizeGrip] =
     ImVec4(0.1450980454683304f, 0.1450980454683304f, 0.1450980454683304f, 1.0f);
-  style.Colors[ImGuiCol_ResizeGripHovered] = mediumGray;
-  style.Colors[ImGuiCol_ResizeGripActive] = lightGray;
+  style.Colors[ImGuiCol_ResizeGripHovered] = hoverColor;
+  style.Colors[ImGuiCol_ResizeGripActive] = activeColor;
   style.Colors[ImGuiCol_Tab] =
     ImVec4(0.0784313753247261f, 0.08627451211214066f, 0.1019607856869698f, 1.0f);
-  style.Colors[ImGuiCol_TabHovered] =
-    ImVec4(0.1176470592617989f, 0.1333333402872086f, 0.1490196138620377f, 1.0f);
-  style.Colors[ImGuiCol_TabActive] =
-    ImVec4(0.1176470592617989f, 0.1333333402872086f, 0.1490196138620377f, 1.0f);
+  style.Colors[ImGuiCol_TabHovered] = hoverColor;
+  style.Colors[ImGuiCol_TabActive] = activeColor;
   style.Colors[ImGuiCol_TabUnfocused] =
     ImVec4(0.0784313753247261f, 0.08627451211214066f, 0.1019607856869698f, 1.0f);
   style.Colors[ImGuiCol_TabUnfocusedActive] = darkGray;
   style.Colors[ImGuiCol_PlotLines] = mediumGray;
-  style.Colors[ImGuiCol_PlotLinesHovered] = lightGray;
+  style.Colors[ImGuiCol_PlotLinesHovered] = activeColor;  // More consistent hover color
   style.Colors[ImGuiCol_PlotHistogram] = mediumGray;
-  style.Colors[ImGuiCol_PlotHistogramHovered] = lightGray;
+  style.Colors[ImGuiCol_PlotHistogramHovered] = activeColor;  // More consistent hover color
   style.Colors[ImGuiCol_TableHeaderBg] =
     ImVec4(0.0470588244497776f, 0.05490196123719215f, 0.07058823853731155f, 1.0f);
   style.Colors[ImGuiCol_TableBorderStrong] =
     ImVec4(0.0470588244497776f, 0.05490196123719215f, 0.07058823853731155f, 1.0f);
   style.Colors[ImGuiCol_TableBorderLight] = ImVec4(0.0f, 0.0f, 0.0f, 1.0f);
-  style.Colors[ImGuiCol_TableRowBg] =
-    ImVec4(0.1176470592617989f, 0.1333333402872086f, 0.1490196138620377f, 1.0f);
+  style.Colors[ImGuiCol_TableRowBg] = darkGray;
   style.Colors[ImGuiCol_TableRowBgAlt] =
     ImVec4(0.09803921729326248f, 0.105882354080677f, 0.1215686276555061f, 1.0f);
-  style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.3f, 0.4f, 0.5f, 0.5f);
+  style.Colors[ImGuiCol_TextSelectedBg] = ImVec4(0.2f, 0.3f, 0.4f, 0.5f);  // Darker selection color
   style.Colors[ImGuiCol_DragDropTarget] = lightGray;
   style.Colors[ImGuiCol_NavHighlight] = mediumGray;
   style.Colors[ImGuiCol_NavWindowingHighlight] = lightGray;
@@ -207,10 +194,42 @@ bool FontManager::Initialize() {
     std::cerr << "Failed to load font: " << geistPath.string() << std::endl;
   }
 
-  // Load a monospace font for code
+  // Load a monospace font for code with Unicode icon support
   std::filesystem::path geistMonoPath = basePath / "assets/fonts/GeistMono-Regular.otf";
+
+  // Create a glyph ranges builder to include Unicode icon ranges
+  ImFontGlyphRangesBuilder builder;
+
+  // Add default ranges
+  builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
+
+  // Add Unicode icon ranges
+  // Material Design Icons range (U+E000 - U+E999)
+  for (ImWchar c = 0xE000; c <= 0xE999; c++)
+    builder.AddChar(c);
+
+  // Nerd Font icons range (U+E700 - U+F000)
+  for (ImWchar c = 0xE700; c <= 0xF000; c++)
+    builder.AddChar(c);
+
+  // Font Awesome range
+  for (ImWchar c = 0xF000; c <= 0xF8FF; c++)
+    builder.AddChar(c);
+
+  // Build the ranges
+  ImVector<ImWchar> ranges;
+  builder.BuildRanges(&ranges);
+
+  // Configure font with icon ranges
+  ImFontConfig iconConfig;
+  iconConfig.MergeMode = true;          // Enable merge mode to avoid font switching
+  iconConfig.GlyphMinAdvanceX = 13.0f;  // Set minimum width for consistent spacing
+  iconConfig.PixelSnapH = true;
+
+  // Load the font with the icon ranges
   ImFont* geistMonoFont =
-    io.Fonts->AddFontFromFileTTF(geistMonoPath.string().c_str(), 16.0f, &config);
+    io.Fonts->AddFontFromFileTTF(geistMonoPath.string().c_str(), 16.0f, &iconConfig, ranges.Data);
+
   fonts["Geist Mono"] = geistMonoFont ? geistMonoFont : fonts["Default"];
   success = success && (geistMonoFont != nullptr);
 
@@ -221,6 +240,18 @@ bool FontManager::Initialize() {
   // Build font atlas
   io.Fonts->Build();
   initialized = true;
+
+  // Also load Geist Mono with icons
+  std::filesystem::path geistMonoIconsPath = basePath / "assets/fonts/GeistMono-Regular.otf";
+
+  // Create a separate font entry with icons
+  if (geistMonoFont) {
+    // We already have the font loaded, now load it again with icon support
+    bool iconFontLoaded = LoadFontWithIcons("Geist Mono Icons", geistMonoIconsPath.string(), 16.0f);
+    if (!iconFontLoaded) {
+      std::cerr << "Failed to load font with icons: " << geistMonoIconsPath.string() << std::endl;
+    }
+  }
 
   // Set default font
   SetCurrentFont("Geist");
@@ -241,6 +272,55 @@ bool FontManager::LoadFont(const std::string& name, const std::string& path, flo
   ImFont* font = io.Fonts->AddFontFromFileTTF(path.c_str(), size, &config);
   if (font == nullptr) {
     std::cerr << "Failed to load font: " << path << std::endl;
+    return false;
+  }
+
+  fonts[name] = font;
+  io.Fonts->Build();
+
+  return true;
+}
+
+bool FontManager::LoadFontWithIcons(const std::string& name, const std::string& path, float size) {
+  if (!initialized) {
+    if (!Initialize())
+      return false;
+  }
+
+  ImGuiIO& io = ImGui::GetIO();
+
+  // Create a glyph ranges builder to include Unicode icon ranges
+  ImFontGlyphRangesBuilder builder;
+
+  // Add default ranges
+  builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
+
+  // Add Unicode icon ranges
+  // Material Design Icons range (U+E000 - U+E999)
+  for (ImWchar c = 0xE000; c <= 0xE999; c++)
+    builder.AddChar(c);
+
+  // Nerd Font icons range (U+E700 - U+F000)
+  for (ImWchar c = 0xE700; c <= 0xF000; c++)
+    builder.AddChar(c);
+
+  // Font Awesome range
+  for (ImWchar c = 0xF000; c <= 0xF8FF; c++)
+    builder.AddChar(c);
+
+  // Build the ranges
+  ImVector<ImWchar> ranges;
+  builder.BuildRanges(&ranges);
+
+  // Configure font with icon ranges
+  ImFontConfig iconConfig;
+  iconConfig.MergeMode = true;          // Enable merge mode to avoid font switching
+  iconConfig.GlyphMinAdvanceX = 13.0f;  // Set minimum width for consistent spacing
+  iconConfig.PixelSnapH = true;
+
+  ImFont* font = io.Fonts->AddFontFromFileTTF(path.c_str(), size, &iconConfig, ranges.Data);
+  if (font == nullptr) {
+    std::cerr << "Failed to load font with icons: " << path << std::endl;
     return false;
   }
 
@@ -346,6 +426,14 @@ void ImGuiThemeManager::SetDefaultFont(float size) {
 
 ImFont* ImGuiThemeManager::GetFont(const std::string& fontName) const {
   return fontManager.GetFont(fontName);
+}
+
+bool ImGuiThemeManager::LoadFontWithIcons(
+  const std::string& name,
+  const std::string& path,
+  float size
+) {
+  return fontManager.LoadFontWithIcons(name, path, size);
 }
 
 }  // namespace visualization

@@ -11,6 +11,9 @@
 #include "imgui_internal.h"
 
 #include "tinyfiledialogs.h"
+#include "visualization/imgui_theme.h"
+#include "visualization/ui_icons.h"
+#include "visualization/ui_theme_colors.h"
 
 namespace daa {
 namespace visualization {
@@ -133,12 +136,30 @@ void UIComponents::RenderEmptyStateOverlay() {
 
     ImVec2 window_size = ImGui::GetWindowSize();
 
+    // Get icon font
+    ImFont* iconFont = GetThemeManager().GetFont("Geist Mono Icons");
+
     // Main title and subtitle text
     const char* main_text = "No Problem Loaded";
     const char* subtext = "Select a problem file from the Problem Selector";
 
-    ImVec2 main_text_size = ImGui::CalcTextSize(main_text);
-    ImVec2 subtext_size = ImGui::CalcTextSize(subtext);
+    // Calculate text sizes including icon if available
+    ImVec2 main_text_size;
+    ImVec2 subtext_size;
+
+    // Calculate icon size if available
+    float icon_width = 0.0f;
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      icon_width = ImGui::CalcTextSize(icons::ERROR_ICON).x + 5.0f;  // Add some spacing
+      ImGui::PopFont();
+    }
+
+    main_text_size = ImGui::CalcTextSize(main_text);
+    main_text_size.x += icon_width;  // Add icon width to text width
+
+    subtext_size = ImGui::CalcTextSize(subtext);
+    subtext_size.x += icon_width;  // Add icon width to text width
 
     // Calculate text box with padding to fit both texts
     float padding_x = 60.0f;
@@ -178,9 +199,20 @@ void UIComponents::RenderEmptyStateOverlay() {
       text_box_min.y + padding_y * 0.4f
     );
 
+    // Add icon before main text if available
+    if (iconFont) {
+      // We need to use a temporary window to render text with a different font
+      ImGui::PushFont(iconFont);
+      ImGui::GetWindowDrawList()->AddText(text_pos, theme::GetErrorColorU32(), icons::ERROR_ICON);
+      ImGui::PopFont();
+
+      // Adjust position for main text after icon
+      text_pos.x += icon_width;
+    }
+
     // Add main text with a soft glow effect
     ImGui::GetWindowDrawList()->AddText(
-      text_pos, ImGui::GetColorU32(ImVec4(1.0f, 1.0f, 1.0f, 1.0f)), main_text
+      text_pos, ImGui::GetColorU32(theme::GetPrimaryTextColor()), main_text
     );
 
     // Add separator line below the main text
@@ -197,8 +229,21 @@ void UIComponents::RenderEmptyStateOverlay() {
       text_pos.y + main_text_size.y + 25.0f
     );
 
+    // Add icon before subtitle if available
+    if (iconFont) {
+      // We need to use a temporary window to render text with a different font
+      ImGui::PushFont(iconFont);
+      ImGui::GetWindowDrawList()->AddText(
+        subtext_pos, ImGui::GetColorU32(theme::GetSecondaryTextColor()), icons::FOLDER_OPEN
+      );
+      ImGui::PopFont();
+
+      // Adjust position for subtitle text after icon
+      subtext_pos.x += icon_width;
+    }
+
     ImGui::GetWindowDrawList()->AddText(
-      subtext_pos, ImGui::GetColorU32(ImVec4(0.8f, 0.8f, 0.9f, 0.9f)), subtext
+      subtext_pos, ImGui::GetColorU32(theme::GetSecondaryTextColor()), subtext
     );
   }
   ImGui::End();
@@ -212,9 +257,21 @@ void UIComponents::RenderWarningDialog(const char* title, const char* message, b
   ImGuiWindowFlags window_flags =
     ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize;
 
+  // With merge mode enabled, we can use the regular font for icons
+  ImFont* regularFont = GetThemeManager().GetFont("Geist Mono");
+
   if (ImGui::Begin(title, p_open, window_flags)) {
-    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.8f, 0.0f, 1.0f));
-    ImGui::Text("⚠");
+    ImGui::PushStyleColor(ImGuiCol_Text, theme::GetWarningTextColor());
+
+    // Use Font Awesome warning icon
+    if (regularFont) {
+      ImGui::PushFont(regularFont);
+      ImGui::Text("%s", icons::WARNING_ICON);
+      ImGui::PopFont();
+    } else {
+      ImGui::Text("⚠");  // Fallback
+    }
+
     ImGui::PopStyleColor();
 
     ImGui::SameLine();
@@ -245,27 +302,104 @@ void UIComponents::RenderProblemSelector() {
   if (!show_problem_selector_ || !problem_manager_)
     return;
 
+  // Get icon font
+  ImFont* iconFont = GetThemeManager().GetFont("Geist Mono Icons");
+
   ImGui::Begin("Problem Selector", &show_problem_selector_);
 
-  ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Available Problems");
+  // Create a header layout with vertically centered title and right-aligned buttons
+  float window_width = ImGui::GetWindowWidth();
+  float spacing = ImGui::GetStyle().ItemSpacing.x;
+  float button_size = 28.0f;  // Fixed square button size
 
-  // Add button for refreshing
-  ImGui::SameLine(ImGui::GetWindowWidth() - 140);  // Position for two buttons
-  if (ImGui::Button("Add File")) {
-    // Use native OS file dialog instead of custom popup
-    const char* filters[] = {"*.txt"};
-    std::string selected_file = OpenFileDialog("Select Problem File", filters, 1);
+  // Title with icon - centered vertically with buttons
+  ImGui::BeginGroup();
+  if (iconFont) {
+    ImGui::PushFont(iconFont);
+    ImGui::TextColored(theme::GetHeaderTextColor(), "%s", icons::FOLDER_OPEN);
+    ImGui::PopFont();
+    ImGui::SameLine(0, 5);
+  }
 
-    // If a file was selected, add it to the problem manager
-    if (!selected_file.empty()) {
-      problem_manager_->addProblemFile(selected_file);
+  // Bold, uppercase title
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 3));  // Adjust vertical alignment
+  ImGui::PushFont(GetThemeManager().GetFont("Geist"));            // Use regular font for title
+  ImGui::PushStyleColor(ImGuiCol_Text, theme::GetHeaderTextColor());
+  ImGui::Text("AVAILABLE PROBLEMS");  // Uppercase title
+  ImGui::PopStyleColor();
+  ImGui::PopFont();
+  ImGui::PopStyleVar();
+  ImGui::EndGroup();
+
+  // Calculate position for right-aligned buttons - tight together
+  float buttons_width = button_size * 2 + spacing;
+  float position_x = window_width - buttons_width - 10.0f;  // 10px margin from right edge
+  ImGui::SameLine(position_x);
+
+  // Style for icon buttons using theme colors
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(7, 7));  // Consistent padding
+  ImGui::PushStyleColor(ImGuiCol_Button, theme::GetIconButtonColor());
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::GetIconButtonHoveredColor());
+  ImGui::PushStyleColor(ImGuiCol_ButtonActive, theme::GetIconButtonActiveColor());
+
+  // Add File button
+  if (iconFont) {
+    ImGui::PushFont(iconFont);
+    // Make sure we're using the correct icon
+    if (ImGui::Button(icons::FILE_IMPORT, ImVec2(button_size, button_size))) {
+      // Use native OS file dialog instead of custom popup
+      const char* filters[] = {"*.txt"};
+      std::string selected_file = OpenFileDialog("Select Problem File", filters, 1);
+
+      // If a file was selected, add it to the problem manager
+      if (!selected_file.empty()) {
+        problem_manager_->addProblemFile(selected_file);
+      }
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Add File");
+    }
+    ImGui::PopFont();
+  } else {
+    if (ImGui::Button("Add", ImVec2(button_size, button_size))) {
+      // Use native OS file dialog instead of custom popup
+      const char* filters[] = {"*.txt"};
+      std::string selected_file = OpenFileDialog("Select Problem File", filters, 1);
+
+      // If a file was selected, add it to the problem manager
+      if (!selected_file.empty()) {
+        problem_manager_->addProblemFile(selected_file);
+      }
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Add File");
     }
   }
 
-  ImGui::SameLine(ImGui::GetWindowWidth() - 70);
-  if (ImGui::Button("Refresh")) {
-    ScanProblemsDirectory();
+  ImGui::SameLine();
+
+  // Refresh button
+  if (iconFont) {
+    ImGui::PushFont(iconFont);
+    if (ImGui::Button(icons::REFRESH, ImVec2(button_size, button_size))) {
+      ScanProblemsDirectory();
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Refresh");
+    }
+    ImGui::PopFont();
+  } else {
+    if (ImGui::Button("R", ImVec2(button_size, button_size))) {
+      ScanProblemsDirectory();
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Refresh");
+    }
   }
+
+  // Restore style
+  ImGui::PopStyleColor(3);  // We pushed 3 colors
+  ImGui::PopStyleVar();
 
   ImGui::Separator();
 
@@ -343,60 +477,139 @@ void UIComponents::RenderProblemInspector() {
   if (!show_problem_inspector_ || !problem_manager_)
     return;
 
+  // Get icon font
+  ImFont* iconFont = GetThemeManager().GetFont("Geist Mono Icons");
+
   ImGui::Begin("Problem Inspector", &show_problem_inspector_);
 
   if (!problem_manager_->isProblemLoaded()) {
-    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.6f, 1.0f), "No problem loaded");
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::TextColored(theme::GetErrorTextColor(), "%s ", icons::ERROR_ICON);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
+    ImGui::TextColored(theme::GetErrorTextColor(), "No problem loaded");
     ImGui::TextWrapped("Select a problem from the Problem Selector window");
   } else {
     VRPTProblem* problem = problem_manager_->getCurrentProblem();
 
-    ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Problem Summary");
+    // Header with icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::TextColored(theme::GetHeaderTextColor(), "%s ", icons::INFO_ICON);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
+    ImGui::TextColored(theme::GetHeaderTextColor(), "Problem Summary");
     ImGui::Separator();
 
     ImGui::Columns(2, "ProblemStats", false);
     ImGui::SetColumnWidth(0, 180);
 
-    ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "Collection Vehicles:");
+    // Collection Vehicles section with icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::TextColored(theme::GetAccentTextColor(), "%s ", icons::COLLECTION_VEHICLE);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
+    ImGui::TextColored(theme::GetAccentTextColor(), "Collection Vehicles:");
     ImGui::NextColumn();
     ImGui::Text("%d vehicles", problem->getNumCVVehicles());
     ImGui::NextColumn();
 
+    // Duration with clock icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::Text("%s ", icons::CLOCK);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
     ImGui::Text("Max Duration (CV):");
     ImGui::NextColumn();
     ImGui::Text("%.2f minutes", problem->getCVMaxDuration().value(units::TimeUnit::Minutes));
     ImGui::NextColumn();
 
+    // Capacity with weight icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::Text("%s ", icons::WEIGHT);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
     ImGui::Text("Capacity (CV):");
     ImGui::NextColumn();
     ImGui::Text("%.2f units", problem->getCVCapacity().value());
     ImGui::NextColumn();
 
-    ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "Transportation Vehicles:");
+    // Transportation Vehicles section with icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::TextColored(theme::GetAccentTextColor(), "%s ", icons::TRANSPORT_VEHICLE);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
+    ImGui::TextColored(theme::GetAccentTextColor(), "Transportation Vehicles:");
     ImGui::NextColumn();
     ImGui::Text("Dynamic");
     ImGui::NextColumn();
 
+    // Duration with clock icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::Text("%s ", icons::CLOCK);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
     ImGui::Text("Max Duration (TV):");
     ImGui::NextColumn();
     ImGui::Text("%.2f minutes", problem->getTVMaxDuration().value(units::TimeUnit::Minutes));
     ImGui::NextColumn();
 
+    // Capacity with weight icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::Text("%s ", icons::WEIGHT);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
     ImGui::Text("Capacity (TV):");
     ImGui::NextColumn();
     ImGui::Text("%.2f units", problem->getTVCapacity().value());
     ImGui::NextColumn();
 
-    ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.4f, 1.0f), "Locations:");
+    // Locations section with icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::TextColored(theme::GetAccentTextColor(), "%s ", icons::LOCATION);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
+    ImGui::TextColored(theme::GetAccentTextColor(), "Locations:");
     ImGui::NextColumn();
     ImGui::Text("");
     ImGui::NextColumn();
 
+    // Collection zones with icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::Text("%s ", icons::COLLECTION_ZONE);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
     ImGui::Text("Collection Zones:");
     ImGui::NextColumn();
     ImGui::Text("%d zones", problem->getNumZones());
     ImGui::NextColumn();
 
+    // Transfer stations with icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::Text("%s ", icons::TRANSFER_STATION);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
     ImGui::Text("Transfer Stations:");
     ImGui::NextColumn();
     ImGui::Text("%zu stations", problem->getSWTS().size());
@@ -405,7 +618,15 @@ void UIComponents::RenderProblemInspector() {
     ImGui::Columns(1);
 
     ImGui::Separator();
-    ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Vehicle Parameters");
+
+    // Vehicle parameters section with icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::TextColored(theme::GetHeaderTextColor(), "%s ", icons::SETTINGS);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
+    ImGui::TextColored(theme::GetHeaderTextColor(), "Vehicle Parameters");
     ImGui::Text(
       "Speed: %.2f km/h",
       problem->getVehicleSpeed().getValue(units::DistanceUnit::Kilometers, units::TimeUnit::Hours)
@@ -413,59 +634,163 @@ void UIComponents::RenderProblemInspector() {
 
     ImGui::Separator();
 
-    if (ImGui::CollapsingHeader("Depot & Landfill Locations")) {
-      try {
-        const auto& depot = problem->getDepot();
-        const auto& landfill = problem->getLandfill();
+    // Depot & Landfill section with icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      const char* headerText = icons::DEPOT;
+      bool opened =
+        ImGui::CollapsingHeader((std::string(headerText) + " Depot & Landfill Locations").c_str());
+      ImGui::PopFont();
 
-        ImGui::Text("Depot: (%.2f, %.2f)", depot.x(), depot.y());
-        ImGui::Text("Landfill: (%.2f, %.2f)", landfill.x(), landfill.y());
-      } catch (const std::exception& e) {
-        ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Error: %s", e.what());
-      }
-    }
+      if (opened) {
+        try {
+          const auto& depot = problem->getDepot();
+          const auto& landfill = problem->getLandfill();
 
-    if (ImGui::CollapsingHeader("Transfer Stations")) {
-      const auto stations = problem->getSWTS();
-      for (size_t i = 0; i < stations.size(); ++i) {
-        ImGui::Text(
-          "%s: (%.2f, %.2f)", stations[i].name().c_str(), stations[i].x(), stations[i].y()
-        );
-      }
-    }
+          // Depot with icon
+          if (iconFont) {
+            ImGui::PushFont(iconFont);
+            ImGui::Text("%s ", icons::DEPOT);
+            ImGui::PopFont();
+            ImGui::SameLine(0, 0);
+          }
+          ImGui::Text("Depot: (%.2f, %.2f)", depot.x(), depot.y());
 
-    if (ImGui::CollapsingHeader("Collection Zones")) {
-      const auto zones = problem->getZones();
-
-      if (ImGui::BeginTable(
-            "ZonesTable",
-            4,
-            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY,
-            ImVec2(0, 200)
-          )) {
-        ImGui::TableSetupColumn("ID");
-        ImGui::TableSetupColumn("Coordinates");
-        ImGui::TableSetupColumn("Waste");
-        ImGui::TableSetupColumn("Service Time");
-        ImGui::TableHeadersRow();
-
-        for (const auto& zone : zones) {
-          ImGui::TableNextRow();
-
-          ImGui::TableSetColumnIndex(0);
-          ImGui::Text("%s", zone.id().c_str());
-
-          ImGui::TableSetColumnIndex(1);
-          ImGui::Text("(%.2f, %.2f)", zone.x(), zone.y());
-
-          ImGui::TableSetColumnIndex(2);
-          ImGui::Text("%.2f", zone.wasteAmount().value());
-
-          ImGui::TableSetColumnIndex(3);
-          ImGui::Text("%.2fs", zone.serviceTime().value(units::TimeUnit::Seconds));
+          // Landfill with icon
+          if (iconFont) {
+            ImGui::PushFont(iconFont);
+            ImGui::Text("%s ", icons::LANDFILL);
+            ImGui::PopFont();
+            ImGui::SameLine(0, 0);
+          }
+          ImGui::Text("Landfill: (%.2f, %.2f)", landfill.x(), landfill.y());
+        } catch (const std::exception& e) {
+          ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Error: %s", e.what());
         }
+      }
+    } else {
+      if (ImGui::CollapsingHeader("Depot & Landfill Locations")) {
+        try {
+          const auto& depot = problem->getDepot();
+          const auto& landfill = problem->getLandfill();
 
-        ImGui::EndTable();
+          ImGui::Text("Depot: (%.2f, %.2f)", depot.x(), depot.y());
+          ImGui::Text("Landfill: (%.2f, %.2f)", landfill.x(), landfill.y());
+        } catch (const std::exception& e) {
+          ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Error: %s", e.what());
+        }
+      }
+    }
+
+    // Transfer Stations section with icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      const char* headerText = icons::TRANSFER_STATION;
+      bool opened =
+        ImGui::CollapsingHeader((std::string(headerText) + " Transfer Stations").c_str());
+      ImGui::PopFont();
+
+      if (opened) {
+        const auto stations = problem->getSWTS();
+        for (size_t i = 0; i < stations.size(); ++i) {
+          if (iconFont) {
+            ImGui::PushFont(iconFont);
+            ImGui::Text("%s ", icons::TRANSFER_STATION);
+            ImGui::PopFont();
+            ImGui::SameLine(0, 0);
+          }
+          ImGui::Text(
+            "%s: (%.2f, %.2f)", stations[i].name().c_str(), stations[i].x(), stations[i].y()
+          );
+        }
+      }
+    } else {
+      if (ImGui::CollapsingHeader("Transfer Stations")) {
+        const auto stations = problem->getSWTS();
+        for (size_t i = 0; i < stations.size(); ++i) {
+          ImGui::Text(
+            "%s: (%.2f, %.2f)", stations[i].name().c_str(), stations[i].x(), stations[i].y()
+          );
+        }
+      }
+    }
+
+    // Collection Zones section with icon
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      const char* headerText = icons::COLLECTION_ZONE;
+      bool opened =
+        ImGui::CollapsingHeader((std::string(headerText) + " Collection Zones").c_str());
+      ImGui::PopFont();
+
+      if (opened) {
+        const auto zones = problem->getZones();
+
+        if (ImGui::BeginTable(
+              "ZonesTable",
+              4,
+              ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY,
+              ImVec2(0, 200)
+            )) {
+          ImGui::TableSetupColumn("ID");
+          ImGui::TableSetupColumn("Coordinates");
+          ImGui::TableSetupColumn("Waste");
+          ImGui::TableSetupColumn("Service Time");
+          ImGui::TableHeadersRow();
+
+          for (const auto& zone : zones) {
+            ImGui::TableNextRow();
+
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("%s", zone.id().c_str());
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("(%.2f, %.2f)", zone.x(), zone.y());
+
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.2f", zone.wasteAmount().value());
+
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.2fs", zone.serviceTime().value(units::TimeUnit::Seconds));
+          }
+
+          ImGui::EndTable();
+        }
+      }
+    } else {
+      if (ImGui::CollapsingHeader("Collection Zones")) {
+        const auto zones = problem->getZones();
+
+        if (ImGui::BeginTable(
+              "ZonesTable",
+              4,
+              ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY,
+              ImVec2(0, 200)
+            )) {
+          ImGui::TableSetupColumn("ID");
+          ImGui::TableSetupColumn("Coordinates");
+          ImGui::TableSetupColumn("Waste");
+          ImGui::TableSetupColumn("Service Time");
+          ImGui::TableHeadersRow();
+
+          for (const auto& zone : zones) {
+            ImGui::TableNextRow();
+
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("%s", zone.id().c_str());
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("(%.2f, %.2f)", zone.x(), zone.y());
+
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.2f", zone.wasteAmount().value());
+
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.2fs", zone.serviceTime().value(units::TimeUnit::Seconds));
+          }
+
+          ImGui::EndTable();
+        }
       }
     }
   }
@@ -550,40 +875,95 @@ void UIComponents::RenderAlgorithmSelector() {
   if (!show_algorithm_selector_ || !problem_manager_)
     return;
 
+  // Get icon font
+  ImFont* iconFont = GetThemeManager().GetFont("Geist Mono Icons");
+
   ImGui::Begin("Algorithm Selector", &show_algorithm_selector_);
 
   if (!problem_manager_->isProblemLoaded()) {
-    ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.6f, 1.0f), "No problem loaded");
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::TextColored(theme::GetErrorTextColor(), "%s ", icons::ERROR_ICON);
+      ImGui::PopFont();
+      ImGui::SameLine(0, 0);
+    }
+    ImGui::TextColored(theme::GetErrorTextColor(), "No problem loaded");
     ImGui::TextWrapped("Load a problem first to select algorithms");
     ImGui::End();
     return;
   }
+
+  // Header with icon
+  if (iconFont) {
+    ImGui::PushFont(iconFont);
+    ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "%s ", icons::SETTINGS);
+    ImGui::PopFont();
+    ImGui::SameLine(0, 0);
+  }
+  ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Algorithm Configuration");
+  ImGui::Separator();
 
   problem_manager_->setSelectedAlgorithm("VRPTSolver");
   problem_manager_->renderAlgorithmConfigurationUI();
 
   if (problem_manager_->isAlgorithmRunning()) {
     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.5f, 0.3f, 0.5f));
-    ImGui::Button("Algorithm Running...", ImVec2(-FLT_MIN, 0));
+
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      ImGui::Button(
+        (std::string(icons::REFRESH) + " Algorithm Running...").c_str(), ImVec2(-FLT_MIN, 0)
+      );
+      ImGui::PopFont();
+    } else {
+      ImGui::Button("Algorithm Running...", ImVec2(-FLT_MIN, 0));
+    }
+
     ImGui::PopStyleColor();
   } else {
     // Use a horizontal layout for buttons
     float width = ImGui::GetContentRegionAvail().x;
     float button_width = (width - ImGui::GetStyle().ItemSpacing.x) / 2;
 
-    if (ImGui::Button("Run Algorithm", ImVec2(button_width, 0))) {
-      if (!problem_manager_->runAlgorithm()) {
-        show_no_algorithm_warning_ = true;
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      if (ImGui::Button(
+            (std::string(icons::PLAY_ICON) + " Run Algorithm").c_str(), ImVec2(button_width, 0)
+          )) {
+        if (!problem_manager_->runAlgorithm()) {
+          show_no_algorithm_warning_ = true;
+        }
+      }
+      ImGui::PopFont();
+    } else {
+      if (ImGui::Button("Run Algorithm", ImVec2(button_width, 0))) {
+        if (!problem_manager_->runAlgorithm()) {
+          show_no_algorithm_warning_ = true;
+        }
       }
     }
 
     ImGui::SameLine();
 
-    if (ImGui::Button("Benchmark All", ImVec2(button_width, 0))) {
-      if (problem_manager_->runBenchmark()) {
-        show_benchmark_results_ = true;
-      } else {
-        show_no_algorithm_warning_ = true;
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      if (ImGui::Button(
+            (std::string(icons::CHART_ICON) + " Benchmark All").c_str(), ImVec2(button_width, 0)
+          )) {
+        if (problem_manager_->runBenchmark()) {
+          show_benchmark_results_ = true;
+        } else {
+          show_no_algorithm_warning_ = true;
+        }
+      }
+      ImGui::PopFont();
+    } else {
+      if (ImGui::Button("Benchmark All", ImVec2(button_width, 0))) {
+        if (problem_manager_->runBenchmark()) {
+          show_benchmark_results_ = true;
+        } else {
+          show_no_algorithm_warning_ = true;
+        }
       }
     }
   }
@@ -879,42 +1259,141 @@ void UIComponents::RenderSolutionStatsWindow() {
   const auto& tv_routes = solution->getTVRoutes();
   VRPTProblem* problem = problem_manager_->getCurrentProblem();
 
+  // Get icon font
+  ImFont* iconFont = GetThemeManager().GetFont("Geist Mono Icons");
+
   ImGuiWindowFlags window_flags = ImGuiWindowFlags_None;
 
   ImGui::Begin("Solution Statistics", &show_solution_stats_, window_flags);
 
-  // Main header with algorithm info
-  ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(100, 180, 255, 255));
-  ImGui::TextWrapped("Algorithm: %s", problem_manager_->getSelectedAlgorithm().c_str());
-  ImGui::PopStyleColor();
+  // Create a header layout with vertically centered title and right-aligned button
+  float window_width = ImGui::GetWindowWidth();
+  float button_size = 28.0f;  // Fixed square button size
 
-  ImGui::SameLine(ImGui::GetWindowWidth() - 80);
-  if (ImGui::Button("Export")) {
-    // TODO: Implement export functionality if needed
+  // Title with icon - centered vertically with button
+  ImGui::BeginGroup();
+  if (iconFont) {
+    ImGui::PushFont(iconFont);
+    ImGui::PushStyleColor(ImGuiCol_Text, theme::GetHeaderTextColor());
+    ImGui::Text("%s", icons::CHART_ICON);
+    ImGui::PopStyleColor();
+    ImGui::PopFont();
+    ImGui::SameLine(0, 5);
   }
+
+  // Bold, uppercase title with algorithm name
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 3));  // Adjust vertical alignment
+  ImGui::PushFont(GetThemeManager().GetFont("Geist"));            // Use regular font for title
+  ImGui::PushStyleColor(ImGuiCol_Text, theme::GetHeaderTextColor());
+  ImGui::Text("SOLUTION: %s", problem_manager_->getSelectedAlgorithm().c_str());
+  ImGui::PopStyleColor();
+  ImGui::PopFont();
+  ImGui::PopStyleVar();
+  ImGui::EndGroup();
+
+  // Calculate position for right-aligned button
+  float position_x = window_width - button_size - 10.0f;  // 10px margin from right edge
+  ImGui::SameLine(position_x);
+
+  // Style for icon button using theme colors
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(7, 7));  // Consistent padding
+  ImGui::PushStyleColor(ImGuiCol_Button, theme::GetIconButtonColor());
+  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, theme::GetIconButtonHoveredColor());
+  ImGui::PushStyleColor(ImGuiCol_ButtonActive, theme::GetIconButtonActiveColor());
+
+  if (iconFont) {
+    ImGui::PushFont(iconFont);
+    if (ImGui::Button(icons::DOWNLOAD, ImVec2(button_size, button_size))) {
+      // TODO: Implement export functionality if needed
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Export Solution");
+    }
+    ImGui::PopFont();
+  } else {
+    if (ImGui::Button("E", ImVec2(button_size, button_size))) {
+      // TODO: Implement export functionality if needed
+    }
+    if (ImGui::IsItemHovered()) {
+      ImGui::SetTooltip("Export Solution");
+    }
+  }
+
+  // Restore style
+  ImGui::PopStyleColor(3);  // We pushed 3 colors
+  ImGui::PopStyleVar();
 
   ImGui::Separator();
 
   // Solution summary section
-  if (ImGui::CollapsingHeader("Solution Summary", ImGuiTreeNodeFlags_DefaultOpen)) {
-    ImGui::BeginTable("SummaryStats", 2, ImGuiTableFlags_BordersInnerH);
-
-    ImGui::TableNextRow();
-    ImGui::TableNextColumn();
-    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "Total Routes:");
-    ImGui::TableNextColumn();
-    ImGui::Text(
-      "%zu (CV: %zu, TV: %zu)",
-      cv_routes.size() + tv_routes.size(),
-      cv_routes.size(),
-      tv_routes.size()
+  if (iconFont) {
+    ImGui::PushFont(iconFont);
+    bool opened = ImGui::CollapsingHeader(
+      (std::string(icons::INFO_ICON) + " Solution Summary").c_str(), ImGuiTreeNodeFlags_DefaultOpen
     );
+    ImGui::PopFont();
 
-    ImGui::TableNextRow();
-    ImGui::TableNextColumn();
-    ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "Total Waste Collected:");
-    ImGui::TableNextColumn();
-    ImGui::Text("%.2f units", solution->totalWasteCollected().value());
+    if (opened) {
+      ImGui::BeginTable("SummaryStats", 2, ImGuiTableFlags_BordersInnerH);
+
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn();
+
+      // Total Routes with icon
+      if (iconFont) {
+        ImGui::PushFont(iconFont);
+        ImGui::TextColored(theme::GetAccentTextColor(), "%s ", icons::ROUTE);
+        ImGui::PopFont();
+        ImGui::SameLine(0, 0);
+      }
+      ImGui::TextColored(theme::GetAccentTextColor(), "Total Routes:");
+      ImGui::TableNextColumn();
+      ImGui::Text(
+        "%zu (CV: %zu, TV: %zu)",
+        cv_routes.size() + tv_routes.size(),
+        cv_routes.size(),
+        tv_routes.size()
+      );
+
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn();
+
+      // Total Waste with icon
+      if (iconFont) {
+        ImGui::PushFont(iconFont);
+        ImGui::TextColored(theme::GetAccentTextColor(), "%s ", icons::WEIGHT);
+        ImGui::PopFont();
+        ImGui::SameLine(0, 0);
+      }
+      ImGui::TextColored(theme::GetAccentTextColor(), "Total Waste Collected:");
+      ImGui::TableNextColumn();
+      ImGui::Text("%.2f units", solution->totalWasteCollected().value());
+
+      ImGui::EndTable();
+    }
+  } else {
+    if (ImGui::CollapsingHeader("Solution Summary", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::BeginTable("SummaryStats", 2, ImGuiTableFlags_BordersInnerH);
+
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn();
+      ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "Total Routes:");
+      ImGui::TableNextColumn();
+      ImGui::Text(
+        "%zu (CV: %zu, TV: %zu)",
+        cv_routes.size() + tv_routes.size(),
+        cv_routes.size(),
+        tv_routes.size()
+      );
+
+      ImGui::TableNextRow();
+      ImGui::TableNextColumn();
+      ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.5f, 1.0f), "Total Waste Collected:");
+      ImGui::TableNextColumn();
+      ImGui::Text("%.2f units", solution->totalWasteCollected().value());
+
+      ImGui::EndTable();
+    }
 
     // Calculate some overall statistics
     Duration total_cv_time(0.0);
@@ -1034,28 +1513,49 @@ void UIComponents::RenderSolutionStatsWindow() {
               ImGui::Separator();
               ImGui::Text("Route Path:");
               ImGui::Indent();
-              ImGui::Text("Depot → ");
+              ImGui::Text("Depot ");
+
+              // With merge mode enabled, we can use the regular font for icons
+              ImFont* regularFont = GetThemeManager().GetFont("Geist Mono");
+
               for (size_t j = 0; j < route.locationIds().size(); j++) {
                 const auto& loc_id = route.locationIds()[j];
                 const auto& location = problem->getLocation(loc_id);
-                ImGui::SameLine(0, 0);
+
+                // Add arrow icon with proper spacing
+                if (regularFont) {
+                  ImGui::SameLine(0, 5);  // Add 5 pixels of spacing before the arrow
+                  ImGui::PushFont(regularFont);
+                  ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", icons::ARROW_RIGHT);
+                  ImGui::PopFont();
+                  ImGui::SameLine(0, 5);  // Add 5 pixels of spacing after the arrow
+                } else {
+                  ImGui::SameLine(0, 0);
+                  ImGui::Text(" → ");
+                  ImGui::SameLine(0, 0);
+                }
 
                 // Color based on location type
                 if (location.type() == LocationType::COLLECTION_ZONE) {
-                  ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "%s", loc_id.c_str());
+                  ImGui::TextColored(theme::GetErrorTextColor(), "%s", loc_id.c_str());
                 } else if (location.type() == LocationType::SWTS) {
-                  ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "%s", loc_id.c_str());
+                  ImGui::TextColored(theme::GetSuccessTextColor(), "%s", loc_id.c_str());
                 } else {
                   ImGui::Text("%s", loc_id.c_str());
                 }
-
-                if (j < route.locationIds().size() - 1) {
-                  ImGui::SameLine(0, 0);
-                  ImGui::Text(" → ");
-                }
               }
-              ImGui::SameLine(0, 0);
-              ImGui::Text(" → Depot");
+              // Add final arrow back to depot
+              if (regularFont) {
+                ImGui::SameLine(0, 5);  // Add 5 pixels of spacing before the arrow
+                ImGui::PushFont(regularFont);
+                ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", icons::ARROW_RIGHT);
+                ImGui::PopFont();
+                ImGui::SameLine(0, 5);  // Add 5 pixels of spacing after the arrow
+              } else {
+                ImGui::SameLine(0, 0);
+                ImGui::Text(" → ");
+              }
+              ImGui::Text("Depot");
               ImGui::Unindent();
             }
             ImGui::EndTooltip();
@@ -1167,21 +1667,32 @@ void UIComponents::RenderSolutionStatsWindow() {
               ImGui::Separator();
               ImGui::Text("Route Path:");
               ImGui::Indent();
-              ImGui::Text("Landfill → ");
+              ImGui::Text("Landfill ");
+
+              // With merge mode enabled, we can use the regular font for icons
+              ImFont* regularFont = GetThemeManager().GetFont("Geist Mono");
+
               for (size_t j = 0; j < route.locationIds().size(); j++) {
                 const auto& loc_id = route.locationIds()[j];
-                ImGui::SameLine(0, 0);
+
+                // Add arrow icon with proper spacing
+                if (regularFont) {
+                  ImGui::SameLine(0, 5);  // Add 5 pixels of spacing before the arrow
+                  ImGui::PushFont(regularFont);
+                  ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "%s", icons::ARROW_RIGHT);
+                  ImGui::PopFont();
+                  ImGui::SameLine(0, 5);  // Add 5 pixels of spacing after the arrow
+                } else {
+                  ImGui::SameLine(0, 0);
+                  ImGui::Text(" → ");
+                  ImGui::SameLine(0, 0);
+                }
 
                 // Color landfill differently
                 if (loc_id == problem->getLandfill().id()) {
-                  ImGui::TextColored(ImVec4(0.8f, 0.6f, 0.4f, 1.0f), "%s", loc_id.c_str());
+                  ImGui::TextColored(theme::GetAccentTextColor(), "%s", loc_id.c_str());
                 } else {
-                  ImGui::TextColored(ImVec4(0.5f, 1.0f, 0.5f, 1.0f), "%s", loc_id.c_str());
-                }
-
-                if (j < route.locationIds().size() - 1) {
-                  ImGui::SameLine(0, 0);
-                  ImGui::Text(" → ");
+                  ImGui::TextColored(theme::GetSuccessTextColor(), "%s", loc_id.c_str());
                 }
               }
               ImGui::Unindent();
@@ -1246,34 +1757,108 @@ void UIComponents::RenderSolutionStatsWindow() {
 }
 
 void UIComponents::RenderUI() {
+  // Get icon font
+  ImFont* iconFont = GetThemeManager().GetFont("Geist Mono Icons");
+
   // Add a menu bar to allow reopening closed windows
   if (ImGui::BeginMainMenuBar()) {
-    if (ImGui::BeginMenu("Windows")) {
-      ImGui::MenuItem("Problem Selector", NULL, &show_problem_selector_);
-      ImGui::MenuItem("Problem Inspector", NULL, &show_problem_inspector_);
-      ImGui::MenuItem("Algorithm Selector", NULL, &show_algorithm_selector_);
+    if (iconFont) {
+      ImGui::PushFont(iconFont);
+      bool menuOpened = ImGui::BeginMenu((std::string(icons::WINDOW_ICON) + " Windows").c_str());
+      ImGui::PopFont();
 
-      // Only enable this menu item when there's a solution available
-      bool has_solution =
-        problem_manager_ && problem_manager_->isProblemLoaded() && problem_manager_->hasSolution();
-      if (ImGui::MenuItem("Solution Statistics", NULL, &show_solution_stats_, has_solution)) {
-        // If clicking to enable and it was disabled, make sure it's visible
-        if (show_solution_stats_ && has_solution) {
-          // Optionally center or position the window when reopening
-          ImGui::SetNextWindowPos(
-            ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f)
-          );
+      if (menuOpened) {
+        // Problem Selector with icon
+        if (iconFont) {
+          ImGui::PushFont(iconFont);
+          ImGui::Text("%s ", icons::FOLDER_OPEN);
+          ImGui::PopFont();
+          ImGui::SameLine(0, 0);
         }
-      }
+        ImGui::MenuItem("Problem Selector", NULL, &show_problem_selector_);
 
-      // Add the benchmark results menu item
-      if (ImGui::MenuItem("Benchmark Results", NULL, &show_benchmark_results_)) {
-        if (problem_manager_) {
-          problem_manager_->setShowBenchmarkResults(show_benchmark_results_);
+        // Problem Inspector with icon
+        if (iconFont) {
+          ImGui::PushFont(iconFont);
+          ImGui::Text("%s ", icons::INFO_ICON);
+          ImGui::PopFont();
+          ImGui::SameLine(0, 0);
         }
-      }
+        ImGui::MenuItem("Problem Inspector", NULL, &show_problem_inspector_);
 
-      ImGui::EndMenu();
+        // Algorithm Selector with icon
+        if (iconFont) {
+          ImGui::PushFont(iconFont);
+          ImGui::Text("%s ", icons::SETTINGS);  // This one is fine, not a macro conflict
+          ImGui::PopFont();
+          ImGui::SameLine(0, 0);
+        }
+        ImGui::MenuItem("Algorithm Selector", NULL, &show_algorithm_selector_);
+
+        // Only enable this menu item when there's a solution available
+        bool has_solution = problem_manager_ && problem_manager_->isProblemLoaded() &&
+                            problem_manager_->hasSolution();
+
+        // Solution Statistics with icon
+        if (iconFont) {
+          ImGui::PushFont(iconFont);
+          ImGui::Text("%s ", icons::CHART_ICON);
+          ImGui::PopFont();
+          ImGui::SameLine(0, 0);
+        }
+        if (ImGui::MenuItem("Solution Statistics", NULL, &show_solution_stats_, has_solution)) {
+          // If clicking to enable and it was disabled, make sure it's visible
+          if (show_solution_stats_ && has_solution) {
+            // Optionally center or position the window when reopening
+            ImGui::SetNextWindowPos(
+              ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f)
+            );
+          }
+        }
+
+        // Add the benchmark results menu item with icon
+        if (iconFont) {
+          ImGui::PushFont(iconFont);
+          ImGui::Text("%s ", icons::CHART_ICON);
+          ImGui::PopFont();
+          ImGui::SameLine(0, 0);
+        }
+        if (ImGui::MenuItem("Benchmark Results", NULL, &show_benchmark_results_)) {
+          if (problem_manager_) {
+            problem_manager_->setShowBenchmarkResults(show_benchmark_results_);
+          }
+        }
+
+        ImGui::EndMenu();
+      }
+    } else {
+      if (ImGui::BeginMenu("Windows")) {
+        ImGui::MenuItem("Problem Selector", NULL, &show_problem_selector_);
+        ImGui::MenuItem("Problem Inspector", NULL, &show_problem_inspector_);
+        ImGui::MenuItem("Algorithm Selector", NULL, &show_algorithm_selector_);
+
+        // Only enable this menu item when there's a solution available
+        bool has_solution = problem_manager_ && problem_manager_->isProblemLoaded() &&
+                            problem_manager_->hasSolution();
+        if (ImGui::MenuItem("Solution Statistics", NULL, &show_solution_stats_, has_solution)) {
+          // If clicking to enable and it was disabled, make sure it's visible
+          if (show_solution_stats_ && has_solution) {
+            // Optionally center or position the window when reopening
+            ImGui::SetNextWindowPos(
+              ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f)
+            );
+          }
+        }
+
+        // Add the benchmark results menu item
+        if (ImGui::MenuItem("Benchmark Results", NULL, &show_benchmark_results_)) {
+          if (problem_manager_) {
+            problem_manager_->setShowBenchmarkResults(show_benchmark_results_);
+          }
+        }
+
+        ImGui::EndMenu();
+      }
     }
     ImGui::EndMainMenuBar();
   }

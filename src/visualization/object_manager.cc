@@ -4,6 +4,7 @@
 #include "visualization/canvas.h"
 #include "visualization/imgui_theme.h"
 #include "visualization/object_manager.h"
+#include "visualization/ui_icons.h"
 
 #include "imgui.h"
 #include "raymath.h"
@@ -341,9 +342,28 @@ void ObjectManager::HandleObjectInteraction(
 
         // Show route information tooltip
         ImGui::BeginTooltip();
+
+        // With merge mode enabled, we can use the regular font for icons
+        ImFont* regularFont = GetThemeManager().GetFont("Geist Mono");
+
+        // Route name with icon
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 220, 150, 255));
+        if (regularFont) {
+          ImGui::PushFont(regularFont);
+          ImGui::Text("%s", icons::ROUTE);
+          ImGui::PopFont();
+          ImGui::SameLine(0, 5);  // Add 5 pixels of spacing after the icon
+        }
         ImGui::Text("%s", route_name.c_str());
         ImGui::PopStyleColor();
+
+        // Instruction with icon
+        if (regularFont) {
+          ImGui::PushFont(regularFont);
+          ImGui::Text("%s", icons::INFO_ICON);
+          ImGui::PopFont();
+          ImGui::SameLine(0, 5);  // Add 5 pixels of spacing after the icon
+        }
         ImGui::Text("Hover over route segments to highlight the route");
         ImGui::EndTooltip();
 
@@ -495,19 +515,19 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
       // Calculate direction vector from start to end
       Vector2 dir = {endX - startX, endY - startY};
       float length = sqrtf(dir.x * dir.x + dir.y * dir.y);
-      
+
       // Normalize direction
       if (length > 0) {
         dir.x /= length;
         dir.y /= length;
       }
-      
+
       // Calculate perpendicular vector
       Vector2 perp = {-dir.y, dir.x};
-      
+
       // Arrow size (proportional to line thickness)
       float arrowSize = adjustedThickness * 10.0f;
-      
+
       // Calculate arrow points
       Vector2 arrowTip = {endX, endY};
       Vector2 arrowBase1 = {
@@ -521,7 +541,7 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
 
       // Fills the gap
       DrawCircle(arrowTip.x, arrowTip.y, adjustedThickness * 0.5f, line_color);
-      
+
       // Draw the arrow
       DrawTriangle(arrowTip, arrowBase1, arrowBase2, line_color);
     }
