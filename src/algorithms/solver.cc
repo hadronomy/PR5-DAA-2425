@@ -8,7 +8,7 @@ namespace algorithm {
 
 void VRPTSolver::renderConfigurationUI() {
   // Step 1: Select algorithm type
-  std::vector<std::string> meta_algorithms = {"GVNS", "MultiStart"};
+  std::vector<std::string> meta_algorithms = {"GVNS", "MultiStart-RVND"};
 
   ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Step 1: Select Algorithm");
 
