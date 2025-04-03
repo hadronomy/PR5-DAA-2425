@@ -115,6 +115,53 @@ void ObjectManager::AssociateNodeWithGroup(
   node_to_group_map_[node_id].insert(group_id);
 }
 
+void ObjectManager::ClearNodeGroupAssociations() {
+  node_to_group_map_.clear();
+}
+
+void ObjectManager::ClearNodeGroupAssociations(const std::string& group_id) {
+  // Iterate through all node entries
+  for (auto& [node_id, groups] : node_to_group_map_) {
+    // Remove the specified group from this node's set of groups
+    groups.erase(group_id);
+  }
+
+  // Clean up empty entries
+  for (auto it = node_to_group_map_.begin(); it != node_to_group_map_.end();) {
+    if (it->second.empty()) {
+      it = node_to_group_map_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
+void ObjectManager::SetSelectedRouteGroup(const std::string& group_id) {
+  // If we're selecting a different group, clear any previous selection
+  if (selected_group_id_ != group_id) {
+    // Store the previous group ID before changing it
+    std::string previous_group_id = selected_group_id_;
+
+    // Update the selected group ID
+    selected_group_id_ = group_id;
+
+    // Reset hover effects for all objects to ensure proper visibility
+    for (auto& obj : objects_) {
+      obj.hover_alpha = 1.0f;
+    }
+  }
+}
+
+void ObjectManager::ClearSelectedRouteGroup() {
+  // Clear the selected group ID
+  selected_group_id_ = "";
+
+  // Reset hover effects for all objects
+  for (auto& obj : objects_) {
+    obj.hover_alpha = 1.0f;
+  }
+}
+
 bool ObjectManager::IsPointNearLine(
   const Vector2& point,
   const Vector2& line_start,
@@ -410,14 +457,32 @@ void ObjectManager::HandleObjectInteraction(
 }
 
 void ObjectManager::UpdateHoverEffects(float delta_time) {
-  for (auto& obj : objects_) {
-    // If we have a selected route, prioritize it over hover
-    std::string priority_group =
-      !selected_group_id_.empty() ? selected_group_id_ : hovered_group_id_;
+  // If we have a selected route, prioritize it over hover
+  std::string priority_group = !selected_group_id_.empty() ? selected_group_id_ : hovered_group_id_;
 
+  // Process each object
+  for (auto& obj : objects_) {
     // Target alpha - prioritize selection over hover
     float target_alpha = 1.0f;
-    if (!priority_group.empty() && obj.group_id != priority_group) {
+
+    // Check if this object is part of the priority group
+    bool is_in_priority_group = false;
+
+    // Direct group membership check
+    if (obj.group_id == priority_group) {
+      is_in_priority_group = true;
+    }
+    // For nodes, check if they're associated with the priority group
+    else if (!priority_group.empty() && obj.HasData("ID")) {
+      std::string node_id = obj.GetData("ID");
+      auto it = node_to_group_map_.find(node_id);
+      if (it != node_to_group_map_.end() && it->second.find(priority_group) != it->second.end()) {
+        is_in_priority_group = true;
+      }
+    }
+
+    // Set target alpha based on group membership
+    if (!priority_group.empty() && !is_in_priority_group) {
       // Make non-selected/non-hovered elements practically invisible
       target_alpha = 0.001f;
     }
@@ -547,39 +612,51 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
 
       // Draw the line with adjusted thickness and alpha
       DrawLineEx({startX, startY}, {endX, endY}, adjustedThickness, line_color);
-      // Draw arrow at the end of the line
-      // Calculate direction vector from start to end
+
+      // Calculate direction vector and length
       Vector2 dir = {endX - startX, endY - startY};
       float length = sqrtf(dir.x * dir.x + dir.y * dir.y);
 
-      // Normalize direction
+      // Arrow size (proportional to line thickness)
+      float arrowSize = adjustedThickness * 3.0f;
+
+      // Draw arrows at intervals along the line
       if (length > 0) {
-        dir.x /= length;
-        dir.y /= length;
+        // Determine number of arrows based on line length
+        // Longer lines get more arrows, with a minimum spacing
+        float minSpacing = arrowSize * 6.0f;  // Reduced spacing between arrows
+        int numArrows = static_cast<int>(fmaxf(2.0f, length / minSpacing));
+
+        // Maximum number of arrows to avoid overcrowding
+        numArrows = fminf(numArrows, 12);
+
+        // Calculate spacing between arrows
+        float spacing = length / (numArrows + 1);
+
+        // Draw arrows at calculated intervals
+        for (int i = 1; i <= numArrows; i++) {
+          float distance = spacing * i;
+          DrawArrowAlongLine({startX, startY}, {endX, endY}, distance, arrowSize, line_color);
+        }
       }
 
-      // Calculate perpendicular vector
-      Vector2 perp = {-dir.y, dir.x};
+      // Draw arrow at the end of the line
+      // Fills the gap at the end
+      DrawCircle(endX, endY, adjustedThickness * 0.5f, line_color);
 
-      // Arrow size (proportional to line thickness)
-      float arrowSize = adjustedThickness * 10.0f;
-
-      // Calculate arrow points
+      // Draw the final arrow at the end
       Vector2 arrowTip = {endX, endY};
+      Vector2 perp = {-dir.y / (length > 0 ? length : 1.0f), dir.x / (length > 0 ? length : 1.0f)};
       Vector2 arrowBase1 = {
-        endX - dir.x * arrowSize + perp.x * arrowSize * 0.5f,
-        endY - dir.y * arrowSize + perp.y * arrowSize * 0.5f
+        endX - dir.x / (length > 0 ? length : 1.0f) * arrowSize + perp.x * arrowSize * 0.5f,
+        endY - dir.y / (length > 0 ? length : 1.0f) * arrowSize + perp.y * arrowSize * 0.5f
       };
       Vector2 arrowBase2 = {
-        endX - dir.x * arrowSize - perp.x * arrowSize * 0.5f,
-        endY - dir.y * arrowSize - perp.y * arrowSize * 0.5f
+        endX - dir.x / (length > 0 ? length : 1.0f) * arrowSize - perp.x * arrowSize * 0.5f,
+        endY - dir.y / (length > 0 ? length : 1.0f) * arrowSize - perp.y * arrowSize * 0.5f
       };
 
-      // Fills the gap
-      DrawCircle(arrowTip.x, arrowTip.y, adjustedThickness * 0.5f, line_color);
-
-      // Draw the arrow
-      DrawTriangle(arrowTip, arrowBase1, arrowBase2, line_color);
+      DrawTriangle(arrowBase2, arrowBase1, arrowTip, line_color);
     }
     // Draw dashed line objects with similar hover effects
     else if (obj.GetData("type") == "dashed_line") {
@@ -650,6 +727,47 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
         // Draw with adjusted thickness and hover alpha
         DrawLineEx(dashStart, dashEnd, adjustedThickness, line_color);
       }
+
+      // Draw arrows at intervals along the dashed line
+      // Arrow size (proportional to line thickness)
+      float arrowSize = adjustedThickness * 2.5f;
+
+      // Determine number of arrows based on line length
+      // For dashed lines, we want fewer arrows than solid lines
+      float minSpacing = arrowSize * 8.0f;  // Reduced spacing for better visibility
+      int numArrows = static_cast<int>(fmaxf(2.0f, length / minSpacing));
+
+      // Maximum number of arrows to avoid overcrowding
+      numArrows = fminf(numArrows, 10);
+
+      // Calculate spacing between arrows
+      float spacing = length / (numArrows + 1);
+
+      // Draw arrows at calculated intervals
+      for (int i = 1; i <= numArrows; i++) {
+        float distance = spacing * i;
+        DrawArrowAlongLine(start, end, distance, arrowSize, line_color);
+      }
+
+      // Draw final arrow at the end
+      if (length > arrowSize * 3) {
+        // Draw circle at the end to fill gap
+        DrawCircle(end.x, end.y, adjustedThickness * 0.4f, line_color);
+
+        // Draw the final arrow
+        Vector2 arrowTip = end;
+        Vector2 perp = {-dir.y, dir.x};
+        Vector2 arrowBase1 = {
+          end.x - dir.x * arrowSize + perp.x * arrowSize * 0.5f,
+          end.y - dir.y * arrowSize + perp.y * arrowSize * 0.5f
+        };
+        Vector2 arrowBase2 = {
+          end.x - dir.x * arrowSize - perp.x * arrowSize * 0.5f,
+          end.y - dir.y * arrowSize - perp.y * arrowSize * 0.5f
+        };
+
+        DrawTriangle(arrowBase2, arrowBase1, arrowTip, line_color);
+      }
     }
   }
 
@@ -669,8 +787,17 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
     std::string priority_group =
       !selected_group_id_.empty() ? selected_group_id_ : hovered_group_id_;
 
-    // Only draw if this is the priority group or if no priority group is set
+    // Check if this node is part of the priority group
     bool is_priority = priority_group.empty() || obj.group_id == priority_group;
+
+    // For nodes, also check if they're associated with the priority group via ID
+    if (!is_priority && !priority_group.empty() && obj.HasData("ID")) {
+      std::string node_id = obj.GetData("ID");
+      auto it = node_to_group_map_.find(node_id);
+      if (it != node_to_group_map_.end() && it->second.find(priority_group) != it->second.end()) {
+        is_priority = true;
+      }
+    }
 
     // For non-priority objects with extremely low alpha, skip drawing completely
     if (!is_priority && obj.hover_alpha < 0.01f) {
@@ -728,6 +855,49 @@ void ObjectManager::DrawObjects(bool use_transformation, Vector2 offset, float s
       DrawText(obj.name.c_str(), pos.x - sz / 2, pos.y - sz - 10, 10, text_color);
     }
   }
+}
+
+void ObjectManager::DrawArrowAlongLine(
+  const Vector2& start,
+  const Vector2& end,
+  float distance_from_start,
+  float arrow_size,
+  Color color
+) {
+  // Calculate direction vector from start to end
+  Vector2 dir = {end.x - start.x, end.y - start.y};
+  float length = sqrtf(dir.x * dir.x + dir.y * dir.y);
+
+  // Normalize direction
+  if (length > 0) {
+    dir.x /= length;
+    dir.y /= length;
+  } else {
+    return;  // Can't draw arrow on zero-length line
+  }
+
+  // Calculate perpendicular vector
+  Vector2 perp = {-dir.y, dir.x};
+
+  // Calculate arrow position along the line
+  Vector2 arrowPos = {start.x + dir.x * distance_from_start, start.y + dir.y * distance_from_start};
+
+  // Make the arrow more visible by increasing its size
+  float actualArrowSize = arrow_size * 0.8f;
+
+  // Calculate arrow points - make it more pronounced
+  Vector2 arrowTip = {arrowPos.x + dir.x * actualArrowSize, arrowPos.y + dir.y * actualArrowSize};
+  Vector2 arrowBase1 = {
+    arrowPos.x - dir.x * actualArrowSize * 0.2f + perp.x * actualArrowSize * 0.7f,
+    arrowPos.y - dir.y * actualArrowSize * 0.2f + perp.y * actualArrowSize * 0.7f
+  };
+  Vector2 arrowBase2 = {
+    arrowPos.x - dir.x * actualArrowSize * 0.2f - perp.x * actualArrowSize * 0.7f,
+    arrowPos.y - dir.y * actualArrowSize * 0.2f - perp.y * actualArrowSize * 0.7f
+  };
+
+  // Draw the arrow triangle
+  DrawTriangle(arrowBase2, arrowBase1, arrowTip, color);
 }
 
 void ObjectManager::DrawShape(const Vector2& position, float size, ObjectShape shape, Color color) {

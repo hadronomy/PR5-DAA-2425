@@ -26,9 +26,17 @@ class ProblemManager {
   // Define a callback type for problem loading notification
   using ProblemLoadedCallback = std::function<void(const Rectangle&)>;
 
+  // Define a callback type for solution changes
+  using SolutionChangedCallback = std::function<void()>;
+
   // Set callback to be called when a problem is loaded
   void SetProblemLoadedCallback(ProblemLoadedCallback callback) {
     problem_loaded_callback_ = callback;
+  }
+
+  // Set callback to be called when a solution is cleared or changed
+  void SetSolutionChangedCallback(SolutionChangedCallback callback) {
+    solution_changed_callback_ = callback;
   }
 
   // Scan a directory for problem files
@@ -97,7 +105,13 @@ class ProblemManager {
   // Solution-related methods
   bool hasSolution() const { return solution_ != nullptr; }
   const algorithm::VRPTSolution* getSolution() const { return solution_.get(); }
-  void clearSolution() { solution_.reset(); }
+  void clearSolution() {
+    solution_.reset();
+    // Notify that solution has been cleared
+    if (solution_changed_callback_) {
+      solution_changed_callback_();
+    }
+  }
 
   // New algorithm configuration getters/setters
   void setSelectedGenerator(const std::string& generator) { selected_generator_ = generator; }
@@ -164,6 +178,9 @@ class ProblemManager {
 
   // Callback to notify when a problem is loaded
   ProblemLoadedCallback problem_loaded_callback_;
+
+  // Callback to notify when a solution is cleared or changed
+  SolutionChangedCallback solution_changed_callback_;
 
   // Algorithm configuration
   std::string selected_generator_;

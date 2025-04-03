@@ -107,9 +107,15 @@ class ObjectManager {
   // Associate node with a route group
   void AssociateNodeWithGroup(const std::string& node_id, const std::string& group_id);
 
+  // Clear all node-to-group associations
+  void ClearNodeGroupAssociations();
+
+  // Clear node-to-group associations for a specific group
+  void ClearNodeGroupAssociations(const std::string& group_id);
+
   // Route selection methods
-  void SetSelectedRouteGroup(const std::string& group_id) { selected_group_id_ = group_id; }
-  void ClearSelectedRouteGroup() { selected_group_id_ = ""; }
+  void SetSelectedRouteGroup(const std::string& group_id);
+  void ClearSelectedRouteGroup();
   const std::string& GetSelectedRouteGroup() const { return selected_group_id_; }
 
  private:
@@ -121,6 +127,15 @@ class ObjectManager {
 
   // Helper methods for drawing different shapes
   void DrawShape(const Vector2& position, float size, ObjectShape shape, Color color);
+
+  // Helper method to draw an arrow along a line
+  void DrawArrowAlongLine(
+    const Vector2& start,
+    const Vector2& end,
+    float distance_from_start,
+    float arrow_size,
+    Color color
+  );
 
   // Helper method to detect if mouse is near a line
   bool IsPointNearLine(

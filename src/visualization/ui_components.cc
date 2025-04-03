@@ -37,6 +37,14 @@ void UIComponents::Initialize() {
 
 void UIComponents::SetProblemManager(ProblemManager* problem_manager) {
   problem_manager_ = problem_manager;
+
+  // Register callback for solution changes
+  if (problem_manager_) {
+    problem_manager_->SetSolutionChangedCallback([this]() {
+      // Clear selected route when solution changes or is cleared
+      ClearSelectedRoute();
+    });
+  }
 }
 
 void UIComponents::ScanProblemsDirectory(const std::string& dir_path) {
@@ -803,6 +811,8 @@ void UIComponents::SetSelectedRoute(const std::string& route_type, int route_ind
 
   // Update visualization to highlight the selected route
   std::string group_id = route_type + "_route_" + std::to_string(route_index);
+
+  // Set the selected route group - this will handle visibility
   object_manager_->SetSelectedRouteGroup(group_id);
 
   // Focus the camera on the selected route

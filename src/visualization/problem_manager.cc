@@ -13,7 +13,10 @@ namespace fs = std::filesystem;
 namespace daa {
 namespace visualization {
 
-ProblemManager::ProblemManager() : current_problem_filename_("") {}
+ProblemManager::ProblemManager()
+    : current_problem_filename_(""),
+      problem_loaded_callback_(nullptr),
+      solution_changed_callback_(nullptr) {}
 
 void ProblemManager::addProblemFile(const std::string& filepath) {
   // Only add if it's a .txt file
@@ -306,6 +309,12 @@ bool ProblemManager::checkAlgorithmCompletion() {
     try {
       solution_ = algorithm_future_.get();
       algorithm_running_ = false;
+
+      // Notify that a new solution has been generated
+      if (solution_changed_callback_) {
+        solution_changed_callback_();
+      }
+
       return true;
     } catch (const std::exception& e) {
       std::cerr << "Error completing algorithm: " << e.what() << std::endl;
