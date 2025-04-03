@@ -1,6 +1,8 @@
 #include "visualization/imgui_theme.h"
+#include <filesystem>
 #include <iostream>
 #include <vector>
+#include "utils.h"
 
 namespace daa {
 namespace visualization {
@@ -191,17 +193,30 @@ bool FontManager::Initialize() {
 
   bool success = true;
 
+  // Get the executable path to make font paths absolute
+  std::filesystem::path exePath = daa::GetExecutablePath();
+  std::filesystem::path basePath = exePath.parent_path();
+
   // Load a regular sans-serif font
-  ImFont* geistFont =
-    io.Fonts->AddFontFromFileTTF("assets/fonts/Geist-Regular.ttf", 16.0f, &config);
+  std::filesystem::path geistPath = basePath / "assets/fonts/Geist-Regular.ttf";
+  ImFont* geistFont = io.Fonts->AddFontFromFileTTF(geistPath.string().c_str(), 16.0f, &config);
   fonts["Geist"] = geistFont ? geistFont : fonts["Default"];
   success = success && (geistFont != nullptr);
 
+  if (!geistFont) {
+    std::cerr << "Failed to load font: " << geistPath.string() << std::endl;
+  }
+
   // Load a monospace font for code
+  std::filesystem::path geistMonoPath = basePath / "assets/fonts/GeistMono-Regular.otf";
   ImFont* geistMonoFont =
-    io.Fonts->AddFontFromFileTTF("assets/fonts/GeistMono-Regular.otf", 16.0f, &config);
+    io.Fonts->AddFontFromFileTTF(geistMonoPath.string().c_str(), 16.0f, &config);
   fonts["Geist Mono"] = geistMonoFont ? geistMonoFont : fonts["Default"];
   success = success && (geistMonoFont != nullptr);
+
+  if (!geistMonoFont) {
+    std::cerr << "Failed to load font: " << geistMonoPath.string() << std::endl;
+  }
 
   // Build font atlas
   io.Fonts->Build();

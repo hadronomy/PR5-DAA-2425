@@ -18,6 +18,71 @@ WindowSystem::WindowSystem() : first_frame_(true), dockspace_id_(0) {
   ini_filename_ = exe_dir + "/resources/layouts/imgui.ini";
 }
 
+WindowSystem::Result<bool> WindowSystem::initialize(const Config& config) {
+  // Store the configuration
+  config_ = config;
+
+  // Set window configuration flags
+  int flags = 0;
+  if (config.msaa)
+    flags |= FLAG_MSAA_4X_HINT;
+  if (config.vsync)
+    flags |= FLAG_VSYNC_HINT;
+  if (config.resizable)
+    flags |= FLAG_WINDOW_RESIZABLE;
+  SetConfigFlags(flags);
+
+  const auto icon_path = GetExecutablePath().parent_path().concat("/assets/icon.png");
+
+  // Initialize window with specified dimensions and title
+  InitWindow(config.width, config.height, config.title.c_str());
+
+  // Try to load the icon
+  try {
+    SetWindowIcon(LoadImage(icon_path.string().c_str()));
+  } catch (...) {
+    // Ignore icon loading errors
+  }
+
+  // Set target framerate
+  SetTargetFPS(config.target_fps);
+
+  // Initialize ImGui
+  rlImGuiSetup(true);
+
+  // Configure ImGui to save window positions and sizes
+  ImGuiIO& io = ImGui::GetIO();
+  io.IniFilename = nullptr;
+
+  // Make sure docking is properly enabled with necessary flags
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  io.ConfigDockingWithShift = true;
+  io.ConfigWindowsResizeFromEdges = true;
+
+  // Initialize fonts before applying theme
+  GetThemeManager().InitializeFonts();
+
+  // Apply our theme immediately after ImGui is set up
+  ConfigureImGuiStyle();
+
+  // Set up docking
+  SetupDocking();
+
+  // Load layout if specified
+  if (config.layout_path) {
+    ini_filename_ = config.layout_path->string();
+    if (!LoadDockingState()) {
+      return std::unexpected(Error::LayoutLoadFailed);
+    }
+  } else {
+    // Try to load default layout
+    LoadDockingState();
+  }
+
+  initialized_ = true;
+  return true;
+}
+
 WindowSystem::~WindowSystem() {
   // Save docking state when application closes
   SaveDockingState();

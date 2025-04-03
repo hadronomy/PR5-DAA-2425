@@ -92,14 +92,23 @@ bool VisualizeCommand::execute() {
   try {
     visualization::VisApplication gui;
 
-    if (!gui.Initialize(1024, 768, "DAA Visualizer")) {
+    // Create configuration for the application
+    visualization::VisApplication::Config config;
+    config.width = 1024;
+    config.height = 768;
+    config.title = "DAA Visualizer";
+
+    // Initialize the application with the configuration
+    auto result = gui.initialize(config);
+    if (!result) {
       if (verbose_) {
         UI::error("Failed to initialize visualization GUI");
       }
       return false;
     }
 
-    gui.Run();
+    // Run the application
+    gui.run();
     return true;
   } catch (const std::exception& e) {
     UI::error(fmt::format("Visualization failed: {}", e.what()));
