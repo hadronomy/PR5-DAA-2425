@@ -5,6 +5,7 @@
 #include "visualization/imgui_theme.h"
 #include "visualization/object_manager.h"
 #include "visualization/ui_icons.h"
+#include "visualization/ui_theme_colors.h"
 
 #include "imgui.h"
 #include "raymath.h"
@@ -232,8 +233,9 @@ void ObjectManager::HandleObjectInteraction(
       ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 12));
       ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 6));
-      ImGui::PushStyleColor(ImGuiCol_PopupBg, ImVec4(0.11f, 0.12f, 0.14f, 0.94f));
-      ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.8f, 0.8f, 0.8f, 0.25f));
+      // Use theme colors for popup background and border
+      ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGui::GetStyle().Colors[ImGuiCol_PopupBg]);
+      ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetStyle().Colors[ImGuiCol_Border]);
 
       ImGui::SetNextWindowSizeConstraints(ImVec2(320, 0), ImVec2(FLT_MAX, FLT_MAX));
       ImGui::BeginTooltip();
@@ -248,45 +250,59 @@ void ObjectManager::HandleObjectInteraction(
       };
 
       ImDrawList* draw_list = ImGui::GetWindowDrawList();
-      draw_list->AddRectFilled(title_min, title_max, ImColor(0.18f, 0.2f, 0.25f, 0.9f), 5.0f);
+      // Use theme colors for title background
+      ImVec4 headerBg = ImGui::GetStyle().Colors[ImGuiCol_TitleBg];
+      draw_list->AddRectFilled(
+        title_min, title_max, ImGui::ColorConvertFloat4ToU32(headerBg), 5.0f
+      );
+
+      // Use a subtle gradient based on the header color
+      ImVec4 headerActive = ImGui::GetStyle().Colors[ImGuiCol_TitleBgActive];
+      ImVec4 gradientStart =
+        ImVec4(headerActive.x + 0.05f, headerActive.y + 0.05f, headerActive.z + 0.05f, 0.3f);
+      ImVec4 gradientEnd = ImVec4(headerBg.x + 0.02f, headerBg.y + 0.02f, headerBg.z + 0.02f, 0.1f);
 
       draw_list->AddRectFilledMultiColor(
         title_min,
         title_max,
-        ImColor(0.4f, 0.5f, 0.7f, 0.3f),
-        ImColor(0.2f, 0.3f, 0.5f, 0.1f),
-        ImColor(0.2f, 0.3f, 0.5f, 0.1f),
-        ImColor(0.4f, 0.5f, 0.7f, 0.3f)
+        ImGui::ColorConvertFloat4ToU32(gradientStart),
+        ImGui::ColorConvertFloat4ToU32(gradientEnd),
+        ImGui::ColorConvertFloat4ToU32(gradientEnd),
+        ImGui::ColorConvertFloat4ToU32(gradientStart)
       );
 
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + title_padding);
       ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4.0f);
-      ImGui::TextColored(ImVec4(1.0f, 0.95f, 0.7f, 1.0f), "* %s", obj.name.c_str());
+      ImGui::TextColored(theme::GetAccentTextColor(), "* %s", obj.name.c_str());
       ImGui::SetCursorPosY(ImGui::GetCursorPosY() + title_padding - 2.0f);
       ImGui::PopFont();
 
       ImGui::Dummy(ImVec2(0, 4));
       const ImVec2 sep_pos = ImGui::GetCursorScreenPos();
       const float sep_width = ImGui::GetContentRegionAvail().x;
+      // Use theme colors for separator
+      ImVec4 sepColor = ImGui::GetStyle().Colors[ImGuiCol_Separator];
+      ImVec4 sepColorDim = ImVec4(sepColor.x, sepColor.y, sepColor.z, sepColor.w * 0.4f);
+
       draw_list->AddRectFilled(
         ImVec2(sep_pos.x, sep_pos.y),
         ImVec2(sep_pos.x + sep_width, sep_pos.y + 1),
-        ImColor(0.6f, 0.7f, 1.0f, 0.4f)
+        ImGui::ColorConvertFloat4ToU32(sepColor)
       );
       draw_list->AddRectFilled(
         ImVec2(sep_pos.x, sep_pos.y + 1),
         ImVec2(sep_pos.x + sep_width, sep_pos.y + 2),
-        ImColor(0.3f, 0.4f, 0.7f, 0.2f)
+        ImGui::ColorConvertFloat4ToU32(sepColorDim)
       );
       ImGui::Dummy(ImVec2(0, 6));
 
       ImGui::Columns(2, "ObjectProperties", false);
       ImGui::SetColumnWidth(0, 100);
 
-      ImGui::TextColored(ImVec4(0.7f, 0.85f, 1.0f, 0.85f), "[P] Position:");
+      ImGui::TextColored(theme::GetHeaderTextColor(), "[P] Position:");
       ImGui::NextColumn();
       ImGui::TextColored(
-        ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%.1f, %.1f", obj.position.x, obj.position.y
+        theme::GetPrimaryTextColor(), "%.1f, %.1f", obj.position.x, obj.position.y
       );
       ImGui::NextColumn();
 
@@ -296,13 +312,10 @@ void ObjectManager::HandleObjectInteraction(
 
       for (const auto& [key, value] : data) {
         ImGui::TextColored(
-          ImVec4(0.7f, 0.85f, 1.0f, 0.85f),
-          "%s %s:",
-          property_icons[property_count % 4],
-          key.c_str()
+          theme::GetHeaderTextColor(), "%s %s:", property_icons[property_count % 4], key.c_str()
         );
         ImGui::NextColumn();
-        ImGui::TextColored(ImVec4(0.9f, 0.9f, 0.9f, 1.0f), "%s", value.c_str());
+        ImGui::TextColored(theme::GetPrimaryTextColor(), "%s", value.c_str());
         ImGui::NextColumn();
         property_count++;
       }
@@ -310,13 +323,24 @@ void ObjectManager::HandleObjectInteraction(
       ImGui::Columns(1);
       ImGui::Dummy(ImVec2(0, 3));
       const ImVec2 bottom_pos = ImGui::GetCursorScreenPos();
+      // Use theme colors for bottom separator with gradient
+      ImVec4 bottomSepColor = ImGui::GetStyle().Colors[ImGuiCol_Separator];
+      ImVec4 bottomSepColorBright = ImVec4(
+        bottomSepColor.x + 0.1f,
+        bottomSepColor.y + 0.1f,
+        bottomSepColor.z + 0.1f,
+        bottomSepColor.w * 0.4f
+      );
+      ImVec4 bottomSepColorDim =
+        ImVec4(bottomSepColor.x, bottomSepColor.y, bottomSepColor.z, bottomSepColor.w * 0.2f);
+
       draw_list->AddRectFilledMultiColor(
         bottom_pos,
         ImVec2(bottom_pos.x + ImGui::GetWindowWidth() - 24, bottom_pos.y + 1),
-        ImColor(0.4f, 0.5f, 0.7f, 0.2f),
-        ImColor(0.6f, 0.7f, 0.9f, 0.4f),
-        ImColor(0.6f, 0.7f, 0.9f, 0.4f),
-        ImColor(0.4f, 0.5f, 0.7f, 0.2f)
+        ImGui::ColorConvertFloat4ToU32(bottomSepColorDim),
+        ImGui::ColorConvertFloat4ToU32(bottomSepColorBright),
+        ImGui::ColorConvertFloat4ToU32(bottomSepColorBright),
+        ImGui::ColorConvertFloat4ToU32(bottomSepColorDim)
       );
 
       ImGui::EndTooltip();
@@ -341,13 +365,20 @@ void ObjectManager::HandleObjectInteraction(
         std::string route_name = obj.name;
 
         // Show route information tooltip
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 12));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 6.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 6));
+        // Use theme colors for popup background and border
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, ImGui::GetStyle().Colors[ImGuiCol_PopupBg]);
+        ImGui::PushStyleColor(ImGuiCol_Border, ImGui::GetStyle().Colors[ImGuiCol_Border]);
+
         ImGui::BeginTooltip();
 
         // With merge mode enabled, we can use the regular font for icons
         ImFont* regularFont = GetThemeManager().GetFont("Geist Mono");
 
         // Route name with icon
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 220, 150, 255));
+        ImGui::PushStyleColor(ImGuiCol_Text, theme::ColorToU32(theme::GetAccentTextColor()));
         if (regularFont) {
           ImGui::PushFont(regularFont);
           ImGui::Text("%s", icons::ROUTE);
@@ -364,8 +395,13 @@ void ObjectManager::HandleObjectInteraction(
           ImGui::PopFont();
           ImGui::SameLine(0, 5);  // Add 5 pixels of spacing after the icon
         }
-        ImGui::Text("Hover over route segments to highlight the route");
+        ImGui::TextColored(
+          theme::GetPrimaryTextColor(), "Hover over route segments to highlight the route"
+        );
         ImGui::EndTooltip();
+
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(3);
 
         break;
       }
