@@ -3,12 +3,13 @@
 #include <latch>
 #include <memory>
 #include <mutex>
-#include <numeric>
 #include <random>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
+
+#include "algorithms/neighborhood_bitmap.h"
 
 #include "algorithm_registry.h"
 #include "algorithms/vrpt_solution.h"
@@ -72,7 +73,7 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     std::latch completion_latch(num_starts_);
 
     // Split work among threads
-    for (int thread_id = 0;
+    for (unsigned int thread_id = 0;
          thread_id < std::min(thread_count, static_cast<unsigned int>(num_starts_));
          ++thread_id) {
       threads.emplace_back([&, thread_id]() {
@@ -80,13 +81,14 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
         std::mt19937 gen(rd());
 
         // Calculate start and end indices for this thread
-        int starts_per_thread = num_starts_ / thread_count;
-        int start_idx = thread_id * starts_per_thread;
-        int end_idx =
-          (thread_id == thread_count - 1) ? num_starts_ : (thread_id + 1) * starts_per_thread;
+        unsigned int starts_per_thread = num_starts_ / thread_count;
+        unsigned int start_idx = thread_id * starts_per_thread;
+        unsigned int end_idx = (thread_id == thread_count - 1)
+                               ? static_cast<unsigned int>(num_starts_)
+                               : (thread_id + 1) * starts_per_thread;
 
         // Process assigned starts
-        for (int i = start_idx; i < end_idx; ++i) {
+        for (unsigned int i = start_idx; i < end_idx; ++i) {
           // Create thread-local copies of solution generator and searches
           auto thread_generator = MetaFactory::createGenerator(generator_name_);
 
@@ -106,15 +108,12 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
             while (improved) {
               improved = false;
 
-              // Create list of available neighborhoods
-              std::vector<size_t> available_searches(thread_searches.size());
-              std::iota(available_searches.begin(), available_searches.end(), 0);
+              // Create bitmap of available neighborhoods
+              NeighborhoodBitmap available_searches(thread_searches.size());
 
-              while (!available_searches.empty() && !improved) {
+              while (available_searches.hasAvailable() && !improved) {
                 // Randomly select neighborhood
-                std::uniform_int_distribution<size_t> dist(0, available_searches.size() - 1);
-                size_t idx = dist(gen);
-                size_t search_idx = available_searches[idx];
+                size_t search_idx = available_searches.selectRandom(gen);
 
                 // Apply search
                 VRPTSolution candidate =
@@ -136,7 +135,7 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
                   current_solution = candidate;
                   improved = true;
                 } else {
-                  available_searches.erase(available_searches.begin() + idx);
+                  available_searches.markUnavailable(search_idx);
                 }
               }
             }

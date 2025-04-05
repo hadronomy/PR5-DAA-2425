@@ -3,12 +3,13 @@
 #include <latch>
 #include <memory>
 #include <mutex>
-#include <numeric>
 #include <random>
 #include <string>
 #include <thread>
 #include <unordered_map>
 #include <vector>
+
+#include "algorithms/neighborhood_bitmap.h"
 
 #include "algorithm_registry.h"
 #include "algorithms/vrpt_solution.h"
@@ -81,7 +82,7 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     std::latch completion_latch(max_iterations_);
 
     // Split work among threads
-    for (int thread_id = 0;
+    for (unsigned int thread_id = 0;
          thread_id < std::min(thread_count, static_cast<unsigned int>(max_iterations_));
          ++thread_id) {
       threads.emplace_back([&, thread_id]() {
@@ -90,10 +91,11 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
         std::mt19937 gen(rd() + thread_id);  // Add thread_id to make each generator unique
 
         // Calculate start and end indices for this thread
-        int iterations_per_thread = max_iterations_ / thread_count;
-        int start_idx = thread_id * iterations_per_thread;
-        int end_idx = (thread_id == thread_count - 1) ? max_iterations_
-                                                      : (thread_id + 1) * iterations_per_thread;
+        unsigned int iterations_per_thread = max_iterations_ / thread_count;
+        unsigned int start_idx = thread_id * iterations_per_thread;
+        unsigned int end_idx = (thread_id == thread_count - 1)
+                               ? static_cast<unsigned int>(max_iterations_)
+                               : (thread_id + 1) * iterations_per_thread;
 
         // Create thread-local copies of metaheuristic components
         auto thread_generator = MetaFactory::createGenerator(generator_name_);
@@ -107,16 +109,13 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
         VRPTSolution current_solution = initial_solution;
 
         // Process assigned iterations
-        for (int iteration = start_idx; iteration < end_idx; ++iteration) {
+        for (unsigned int iteration = start_idx; iteration < end_idx; ++iteration) {
           // Random Variable Neighborhood Descent (RVND)
-          std::vector<size_t> available_neighborhoods(thread_neighborhoods.size());
-          std::iota(available_neighborhoods.begin(), available_neighborhoods.end(), 0);
+          NeighborhoodBitmap available_neighborhoods(thread_neighborhoods.size());
 
-          while (!available_neighborhoods.empty()) {
+          while (available_neighborhoods.hasAvailable()) {
             // Randomly select neighborhood
-            std::uniform_int_distribution<size_t> dist(0, available_neighborhoods.size() - 1);
-            size_t idx = dist(gen);
-            size_t k = available_neighborhoods[idx];
+            size_t k = available_neighborhoods.selectRandom(gen);
 
             // Apply current neighborhood search
             VRPTSolution improved_solution =
@@ -147,11 +146,10 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
             if (is_better) {
               // Improvement found, reset available neighborhoods
               current_solution = improved_solution;
-              available_neighborhoods.resize(thread_neighborhoods.size());
-              std::iota(available_neighborhoods.begin(), available_neighborhoods.end(), 0);
+              available_neighborhoods.resetAll();
             } else {
-              // No improvement, remove this neighborhood from consideration
-              available_neighborhoods.erase(available_neighborhoods.begin() + idx);
+              // No improvement, mark this neighborhood as unavailable
+              available_neighborhoods.markUnavailable(k);
             }
           }
 
