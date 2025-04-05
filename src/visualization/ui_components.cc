@@ -961,7 +961,9 @@ void UIComponents::RenderAlgorithmSelector() {
             (std::string(icons::CHART_ICON) + " Benchmark All").c_str(), ImVec2(button_width, 0)
           )) {
         if (problem_manager_->runBenchmark()) {
+          // Make sure the benchmark results window is shown
           show_benchmark_results_ = true;
+          problem_manager_->setShowBenchmarkResults(true);
         } else {
           show_no_algorithm_warning_ = true;
         }
@@ -970,7 +972,9 @@ void UIComponents::RenderAlgorithmSelector() {
     } else {
       if (ImGui::Button("Benchmark All", ImVec2(button_width, 0))) {
         if (problem_manager_->runBenchmark()) {
+          // Make sure the benchmark results window is shown
           show_benchmark_results_ = true;
+          problem_manager_->setShowBenchmarkResults(true);
         } else {
           show_no_algorithm_warning_ = true;
         }
@@ -1891,7 +1895,11 @@ void UIComponents::RenderUI() {
     }
 
     // Check if benchmark completed
-    problem_manager_->checkBenchmarkCompletion();
+    if (problem_manager_->checkBenchmarkCompletion()) {
+      // Benchmark finished! Make sure results window is shown
+      show_benchmark_results_ = true;
+      problem_manager_->setShowBenchmarkResults(true);
+    }
   }
 
   // Show solution stats if available

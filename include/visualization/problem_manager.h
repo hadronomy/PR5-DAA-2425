@@ -2,11 +2,14 @@
 
 #include <atomic>
 #include <chrono>
+#include <expected>
 #include <functional>
-#include <future>
 #include <memory>
+#include <mutex>
 #include <set>
+#include <stop_token>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -194,19 +197,23 @@ class ProblemManager {
   bool has_solution_ = false;
 
   // Async algorithm management
-  std::future<std::unique_ptr<algorithm::VRPTSolution>> algorithm_future_;
+  std::jthread algorithm_thread_;
+  std::mutex solution_mutex_;  // Protects thread_solution_, algorithm_status_message_, and other
+                               // shared state
+  std::unique_ptr<algorithm::VRPTSolution> thread_solution_;
   bool algorithm_running_ = false;
-  float algorithm_progress_ = 0.0f;
+  std::atomic<float> algorithm_progress_{0.0f};
   std::string algorithm_status_message_ = "Initializing...";
   std::chrono::steady_clock::time_point algorithm_start_time_;
 
   // Benchmark-related member variables
   std::vector<BenchmarkResult> benchmark_results_;
+  std::mutex benchmark_results_mutex_;
   bool benchmark_running_ = false;
   bool show_benchmark_results_ = false;
   std::atomic<int> benchmark_completed_count_{0};
   std::atomic<int> benchmark_total_count_{0};
-  std::future<void> benchmark_future_;
+  std::jthread benchmark_thread_;
 };
 
 }  // namespace visualization

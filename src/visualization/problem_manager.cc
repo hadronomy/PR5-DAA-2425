@@ -4,6 +4,9 @@
 #include <filesystem>
 #include <iostream>
 #include <limits>
+#include <mutex>
+#include <stop_token>
+#include <thread>
 
 #include "algorithm_registry.h"
 #include "imgui.h"
@@ -259,7 +262,10 @@ bool ProblemManager::runAlgorithm() {
 
     // Reset progress and status
     algorithm_progress_ = 0.0f;
-    algorithm_status_message_ = "Initializing...";
+    {
+      std::lock_guard<std::mutex> lock(solution_mutex_);
+      algorithm_status_message_ = "Initializing...";
+    }
     algorithm_running_ = true;
     algorithm_start_time_ = std::chrono::steady_clock::now();
 
@@ -270,23 +276,43 @@ bool ProblemManager::runAlgorithm() {
       current_algorithm_type_ = selected_algorithm_;
     }
 
-    // Launch the algorithm asynchronously
-    algorithm_future_ = std::async(std::launch::async, [this, problem]() {
+    // Clear any previous solution
+    {
+      std::lock_guard<std::mutex> lock(solution_mutex_);
+      thread_solution_.reset();
+    }
+
+    // Launch the algorithm using jthread with stop_token support
+    algorithm_thread_ = std::jthread([this, problem](std::stop_token stop_token) {
       try {
-        algorithm_status_message_ = "Solving problem...";
-        algorithm_progress_ = 0.2f;
+        // Update status in a thread-safe way
+        {
+          std::lock_guard<std::mutex> lock(solution_mutex_);
+          algorithm_status_message_ = "Solving problem...";
+          algorithm_progress_ = 0.2f;
+        }
 
         // Run the actual algorithm
         auto solution =
           std::make_unique<algorithm::VRPTSolution>(current_algorithm_->solve(*problem));
 
-        algorithm_progress_ = 1.0f;
-        algorithm_status_message_ = "Solution found!";
+        // Check if we've been requested to stop
+        if (stop_token.stop_requested()) {
+          return;
+        }
 
-        return solution;
+        // Store the solution and update status in a thread-safe way
+        {
+          std::lock_guard<std::mutex> lock(solution_mutex_);
+          thread_solution_ = std::move(solution);
+          algorithm_progress_ = 1.0f;
+          algorithm_status_message_ = "Solution found!";
+        }
       } catch (const std::exception& e) {
-        algorithm_status_message_ = std::string("Error: ") + e.what();
-        throw;  // Rethrow to be caught in the main thread
+        if (!stop_token.stop_requested()) {
+          std::lock_guard<std::mutex> lock(solution_mutex_);
+          algorithm_status_message_ = std::string("Error: ") + e.what();
+        }
       }
     });
 
@@ -303,33 +329,40 @@ bool ProblemManager::checkAlgorithmCompletion() {
     return false;
   }
 
-  // Check if the future is ready without blocking
-  if (algorithm_future_.valid() &&
-      algorithm_future_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-    try {
-      solution_ = algorithm_future_.get();
-      algorithm_running_ = false;
+  // Check if we have a solution available
+  std::unique_ptr<algorithm::VRPTSolution> thread_result;
+  {
+    std::lock_guard<std::mutex> lock(solution_mutex_);
+    if (thread_solution_) {
+      thread_result = std::move(thread_solution_);
+    }
+  }
+
+  // If we have a solution or the progress is at 100%, consider it complete
+  if (thread_result || algorithm_progress_ >= 1.0f) {
+    if (thread_result) {
+      // We have a valid solution
+      solution_ = std::move(thread_result);
 
       // Notify that a new solution has been generated
       if (solution_changed_callback_) {
         solution_changed_callback_();
       }
-
-      return true;
-    } catch (const std::exception& e) {
-      std::cerr << "Error completing algorithm: " << e.what() << std::endl;
-      algorithm_running_ = false;
-      return false;
     }
+
+    algorithm_running_ = false;
+    return true;
   }
 
-  // Update progress as time passes to provide visual feedback
+  // Thread is still running, update progress as time passes to provide visual feedback
   auto elapsed = std::chrono::steady_clock::now() - algorithm_start_time_;
   auto elapsed_sec =
     std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() / 1000.0f;
 
   // Limit progress to 90% until we get the actual result
-  algorithm_progress_ = std::min(0.9f, 0.2f + elapsed_sec / 10.0f);
+  if (algorithm_progress_ < 0.9f) {
+    algorithm_progress_ = std::min(0.9f, 0.2f + elapsed_sec / 10.0f);
+  }
 
   return false;
 }
@@ -355,7 +388,14 @@ void ProblemManager::renderAlgorithmProgressDialog() {
     ImGui::Spacing();
     ImGui::Spacing();
 
-    ImGui::TextWrapped("%s", algorithm_status_message_.c_str());
+    // Get status message in a thread-safe way
+    std::string status_message;
+    {
+      std::lock_guard<std::mutex> lock(solution_mutex_);
+      status_message = algorithm_status_message_;
+    }
+
+    ImGui::TextWrapped("%s", status_message.c_str());
     ImGui::Spacing();
 
     ImGui::ProgressBar(algorithm_progress_, ImVec2(-1, 16), "");
@@ -379,11 +419,30 @@ void ProblemManager::cancelAlgorithm() {
     return;
   }
 
-  // We can't truly cancel an async operation that doesn't support cancellation
-  // But we can mark it as cancelled and ignore results
-  algorithm_status_message_ = "Cancelled by user";
+  // Request the algorithm thread to stop using the stop_token
+  if (algorithm_thread_.joinable()) {
+    algorithm_thread_.request_stop();
+    // No need to join, jthread will automatically join when it goes out of scope
+  }
+
+  // Also cancel benchmark if it's running
+  if (benchmark_running_ && benchmark_thread_.joinable()) {
+    benchmark_thread_.request_stop();
+  }
+
+  // Update status message in a thread-safe way
+  {
+    std::lock_guard<std::mutex> lock(solution_mutex_);
+    algorithm_status_message_ = "Cancelled by user";
+  }
+
   algorithm_running_ = false;
-  // Future will still run to completion but we won't use the result
+
+  // If this was a benchmark cancellation, also update benchmark state
+  if (benchmark_running_) {
+    algorithm_progress_ = 1.0f;  // Set progress to 100% when cancelled
+    benchmark_running_ = false;
+  }
 }
 
 void ProblemManager::renderAlgorithmConfigurationUI() {
@@ -413,14 +472,21 @@ bool ProblemManager::runBenchmark(int runs_per_instance) {
 
   try {
     // Clear previous results
-    benchmark_results_.clear();
+    {
+      std::lock_guard<std::mutex> lock(benchmark_results_mutex_);
+      benchmark_results_.clear();
+    }
     benchmark_completed_count_ = 0;
 
     // Count total runs
     benchmark_total_count_ = available_problems_.size() * runs_per_instance;
 
-    // Reset status
-    algorithm_status_message_ = "Initializing benchmark...";
+    // Reset status and progress
+    {
+      std::lock_guard<std::mutex> lock(solution_mutex_);
+      algorithm_status_message_ = "Initializing benchmark...";
+      algorithm_progress_ = 0.0f;  // Start with 0% progress
+    }
     benchmark_running_ = true;
     algorithm_running_ = true;  // Use same UI indicators
     algorithm_start_time_ = std::chrono::steady_clock::now();
@@ -432,14 +498,27 @@ bool ProblemManager::runBenchmark(int runs_per_instance) {
       current_algorithm_type_ = selected_algorithm_;
     }
 
-    // Launch the benchmark asynchronously
-    benchmark_future_ = std::async(std::launch::async, [this, runs_per_instance]() {
+    // Launch the benchmark using jthread with stop_token support
+    benchmark_thread_ = std::jthread([this, runs_per_instance](std::stop_token stop_token) {
       // Save current problem to restore later
       std::string original_problem = current_problem_filename_;
 
       try {
         for (const auto& problem_file : available_problems_) {
-          algorithm_status_message_ = "Benchmarking: " + fs::path(problem_file).filename().string();
+          // Check if stop was requested
+          if (stop_token.stop_requested()) {
+            std::lock_guard<std::mutex> lock(solution_mutex_);
+            algorithm_status_message_ = "Benchmark cancelled";
+            algorithm_progress_ = 1.0f;  // Set progress to 100% when cancelled
+            break;
+          }
+
+          // Update status message in a thread-safe way
+          {
+            std::lock_guard<std::mutex> lock(solution_mutex_);
+            algorithm_status_message_ =
+              "Benchmarking: " + fs::path(problem_file).filename().string();
+          }
 
           // Load the problem
           if (!loadProblem(problem_file)) {
@@ -456,6 +535,14 @@ bool ProblemManager::runBenchmark(int runs_per_instance) {
 
           // Run the algorithm multiple times on this instance
           for (int run = 0; run < runs_per_instance; run++) {
+            // Check if stop was requested
+            if (stop_token.stop_requested()) {
+              std::lock_guard<std::mutex> lock(solution_mutex_);
+              algorithm_status_message_ = "Benchmark cancelled";
+              algorithm_progress_ = 1.0f;  // Set progress to 100% when cancelled
+              break;
+            }
+
             auto start_time = std::chrono::high_resolution_clock::now();
 
             // Run the algorithm
@@ -465,7 +552,7 @@ bool ProblemManager::runBenchmark(int runs_per_instance) {
             double elapsed_ms =
               std::chrono::duration<double, std::milli>(end_time - start_time).count();
 
-            // Store the result
+            // Store the result in a thread-safe way
             BenchmarkResult result;
             result.instance_name = fs::path(problem_file).filename().string();
             result.num_zones = num_zones;
@@ -474,8 +561,24 @@ bool ProblemManager::runBenchmark(int runs_per_instance) {
             result.tv_count = solution.getTVRoutes().size();
             result.cpu_time_ms = elapsed_ms;
 
-            benchmark_results_.push_back(result);
+            {
+              std::lock_guard<std::mutex> lock(benchmark_results_mutex_);
+              benchmark_results_.push_back(result);
+            }
+
+            // Update completion count and progress
             benchmark_completed_count_++;
+
+            // Update progress directly to ensure UI reflects current state
+            if (benchmark_total_count_ > 0) {
+              algorithm_progress_ =
+                static_cast<float>(benchmark_completed_count_) / benchmark_total_count_;
+            }
+          }
+
+          // Check if we need to break the outer loop too
+          if (stop_token.stop_requested()) {
+            break;
           }
         }
 
@@ -484,15 +587,39 @@ bool ProblemManager::runBenchmark(int runs_per_instance) {
           loadProblem(original_problem);
         }
 
-        algorithm_status_message_ = "Benchmark complete!";
+        if (!stop_token.stop_requested()) {
+          // Signal benchmark completion
+          std::lock_guard<std::mutex> lock(solution_mutex_);
+          algorithm_status_message_ = "Benchmark complete!";
+
+          // Ensure progress is at 100% when complete
+          algorithm_progress_ = 1.0f;
+
+          // Force benchmark state to complete
+          benchmark_running_ = false;
+          algorithm_running_ = false;
+
+          // Make sure the results window stays open
+          show_benchmark_results_ = true;
+        }
 
       } catch (const std::exception& e) {
-        algorithm_status_message_ = std::string("Benchmark error: ") + e.what();
+        if (!stop_token.stop_requested()) {
+          std::lock_guard<std::mutex> lock(solution_mutex_);
+          algorithm_status_message_ = std::string("Benchmark error: ") + e.what();
+          algorithm_progress_ = 1.0f;  // Set progress to 100% on error
+
+          // Force benchmark state to complete
+          benchmark_running_ = false;
+          algorithm_running_ = false;
+
+          // Make sure the results window stays open
+          show_benchmark_results_ = true;
+        }
         // Restore original problem if valid
         if (!original_problem.empty()) {
           loadProblem(original_problem);
         }
-        throw;
       }
     });
 
@@ -512,25 +639,56 @@ bool ProblemManager::checkBenchmarkCompletion() {
     return false;
   }
 
-  // Update progress based on completed runs
-  if (benchmark_total_count_ > 0) {
-    algorithm_progress_ = static_cast<float>(benchmark_completed_count_) / benchmark_total_count_;
+  // Get status message in a thread-safe way
+  std::string status_message;
+  {
+    std::lock_guard<std::mutex> lock(solution_mutex_);
+    status_message = algorithm_status_message_;
   }
 
-  // Check if the future is ready without blocking
-  if (benchmark_future_.valid() &&
-      benchmark_future_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-    try {
-      benchmark_future_.get();  // Get any exceptions
-      benchmark_running_ = false;
-      algorithm_running_ = false;
-      return true;
-    } catch (const std::exception& e) {
-      std::cerr << "Error completing benchmark: " << e.what() << std::endl;
-      benchmark_running_ = false;
-      algorithm_running_ = false;
-      return false;
+  // Get current completion count
+  int completed = benchmark_completed_count_.load();
+  int total = benchmark_total_count_.load();
+
+  // Check for completion conditions
+  bool is_complete = false;
+
+  // Check if all runs are completed
+  if (total > 0 && completed >= total) {
+    is_complete = true;
+  }
+
+  // Check status messages that indicate completion
+  if (status_message == "Benchmark complete!" || status_message == "Benchmark cancelled" ||
+      status_message.find("Benchmark error") == 0) {
+    is_complete = true;
+  }
+
+  // Check if thread is no longer running
+  if (!benchmark_thread_.joinable()) {
+    is_complete = true;
+  }
+
+  // If benchmark is complete, update state
+  if (is_complete) {
+    // Set flags to indicate completion
+    benchmark_running_ = false;
+    algorithm_running_ = false;
+
+    // Ensure progress bar shows 100% when complete
+    algorithm_progress_ = 1.0f;
+
+    // Make sure the status message indicates completion if it doesn't already
+    if (status_message != "Benchmark complete!" && status_message != "Benchmark cancelled" &&
+        status_message.find("Benchmark error") != 0) {
+      std::lock_guard<std::mutex> lock(solution_mutex_);
+      algorithm_status_message_ = "Benchmark complete!";
     }
+
+    // Make sure the results window stays open
+    show_benchmark_results_ = true;
+
+    return true;
   }
 
   return false;
@@ -546,125 +704,164 @@ void ProblemManager::renderBenchmarkResultsWindow(bool* p_open) {
   ImGuiWindowFlags window_flags = ImGuiWindowFlags_None;
 
   if (ImGui::Begin("Benchmark Results", p_open, window_flags)) {
+    // Get status message in a thread-safe way
+    std::string status_message;
+    {
+      std::lock_guard<std::mutex> lock(solution_mutex_);
+      status_message = algorithm_status_message_;
+    }
+
+    // Get a thread-safe copy of the benchmark results
+    std::vector<BenchmarkResult> results_copy;
+    {
+      std::lock_guard<std::mutex> lock(benchmark_results_mutex_);
+      results_copy = benchmark_results_;
+    }
+
+    // Check if we have a completion status message
+    bool has_completion_status =
+      (status_message == "Benchmark complete!" || status_message == "Benchmark cancelled" ||
+       status_message.find("Benchmark error") == 0);
+
     // Show status during running
     if (benchmark_running_) {
       ImGui::TextColored(ImVec4(0.8f, 1.0f, 0.8f, 1.0f), "Running benchmark...");
       ImGui::Text(
         "%d/%d completed", benchmark_completed_count_.load(), benchmark_total_count_.load()
       );
+      ImGui::TextWrapped("%s", status_message.c_str());
       ImGui::ProgressBar(algorithm_progress_, ImVec2(-1, 16));
 
       auto elapsed = std::chrono::steady_clock::now() - algorithm_start_time_;
       auto elapsed_sec = std::chrono::duration_cast<std::chrono::seconds>(elapsed).count();
       ImGui::Text("Elapsed time: %02d:%02d", (int)(elapsed_sec / 60), (int)(elapsed_sec % 60));
-    } else if (!benchmark_results_.empty()) {
-      if (ImGui::BeginTable(
-            "BenchmarkTable",
-            6,
-            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
-              ImGuiTableFlags_Sortable
-          )) {
+    }
+    // Show completion message and results
+    else {
+      // Show completion status if available
+      if (has_completion_status) {
+        ImGui::TextColored(
+          status_message == "Benchmark complete!" ? ImVec4(0.0f, 1.0f, 0.0f, 1.0f)
+                                                  : ImVec4(1.0f, 0.5f, 0.0f, 1.0f),
+          "%s",
+          status_message.c_str()
+        );
+        ImGui::Separator();
+        ImGui::Spacing();
+      }
 
-        ImGui::TableSetupColumn("Instance", ImGuiTableColumnFlags_DefaultSort);
-        ImGui::TableSetupColumn("Zones", ImGuiTableColumnFlags_WidthFixed, 60.0f);
-        ImGui::TableSetupColumn("Run #", ImGuiTableColumnFlags_WidthFixed, 60.0f);
-        ImGui::TableSetupColumn("#CV", ImGuiTableColumnFlags_WidthFixed, 60.0f);
-        ImGui::TableSetupColumn("#TV", ImGuiTableColumnFlags_WidthFixed, 60.0f);
-        ImGui::TableSetupColumn("CPU Time (ms)", ImGuiTableColumnFlags_WidthFixed, 120.0f);
-        ImGui::TableHeadersRow();
+      // Show results if available
+      if (!results_copy.empty()) {
+        if (ImGui::BeginTable(
+              "BenchmarkTable",
+              6,
+              ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
+                ImGuiTableFlags_Sortable
+            )) {
 
-        // Display all benchmark results
-        for (const auto& result : benchmark_results_) {
+          ImGui::TableSetupColumn("Instance", ImGuiTableColumnFlags_DefaultSort);
+          ImGui::TableSetupColumn("Zones", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+          ImGui::TableSetupColumn("Run #", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+          ImGui::TableSetupColumn("#CV", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+          ImGui::TableSetupColumn("#TV", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+          ImGui::TableSetupColumn("CPU Time (ms)", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+          ImGui::TableHeadersRow();
+
+          // Display all benchmark results (we already have a thread-safe copy from above)
+
+          for (const auto& result : results_copy) {
+            ImGui::TableNextRow();
+
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("%s", result.instance_name.c_str());
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("%d", result.num_zones);
+
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%d", result.run_number);
+
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%d", result.cv_count);
+
+            ImGui::TableSetColumnIndex(4);
+            ImGui::Text("%d", result.tv_count);
+
+            ImGui::TableSetColumnIndex(5);
+            ImGui::Text("%.2f", result.cpu_time_ms);
+          }
+
+          // Calculate and show averages
           ImGui::TableNextRow();
-
           ImGui::TableSetColumnIndex(0);
-          ImGui::Text("%s", result.instance_name.c_str());
+          ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.5f, 1.0f));
+          ImGui::Text("AVERAGES");
 
-          ImGui::TableSetColumnIndex(1);
-          ImGui::Text("%d", result.num_zones);
+          // Calculate averages (using the thread-safe copy)
+          double avg_cv = 0.0, avg_tv = 0.0, avg_time = 0.0;
+          int count = 0;
 
-          ImGui::TableSetColumnIndex(2);
-          ImGui::Text("%d", result.run_number);
+          for (const auto& result : results_copy) {
+            avg_cv += result.cv_count;
+            avg_tv += result.tv_count;
+            avg_time += result.cpu_time_ms;
+            count++;
+          }
 
+          if (count > 0) {
+            avg_cv /= count;
+            avg_tv /= count;
+            avg_time /= count;
+          }
+
+          // Skip zones and run# columns
           ImGui::TableSetColumnIndex(3);
-          ImGui::Text("%d", result.cv_count);
+          ImGui::Text("%.2f", avg_cv);
 
           ImGui::TableSetColumnIndex(4);
-          ImGui::Text("%d", result.tv_count);
+          ImGui::Text("%.2f", avg_tv);
 
           ImGui::TableSetColumnIndex(5);
-          ImGui::Text("%.2f", result.cpu_time_ms);
+          ImGui::Text("%.2f", avg_time);
+          ImGui::PopStyleColor();
+
+          ImGui::EndTable();
         }
-
-        // Calculate and show averages
-        ImGui::TableNextRow();
-        ImGui::TableSetColumnIndex(0);
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 0.5f, 1.0f));
-        ImGui::Text("AVERAGES");
-
-        // Calculate averages
-        double avg_cv = 0.0, avg_tv = 0.0, avg_time = 0.0;
-        int count = 0;
-
-        for (const auto& result : benchmark_results_) {
-          avg_cv += result.cv_count;
-          avg_tv += result.tv_count;
-          avg_time += result.cpu_time_ms;
-          count++;
-        }
-
-        if (count > 0) {
-          avg_cv /= count;
-          avg_tv /= count;
-          avg_time /= count;
-        }
-
-        // Skip zones and run# columns
-        ImGui::TableSetColumnIndex(3);
-        ImGui::Text("%.2f", avg_cv);
-
-        ImGui::TableSetColumnIndex(4);
-        ImGui::Text("%.2f", avg_tv);
-
-        ImGui::TableSetColumnIndex(5);
-        ImGui::Text("%.2f", avg_time);
-        ImGui::PopStyleColor();
-
-        ImGui::EndTable();
+      } else {
+        ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No benchmark data available");
+        ImGui::Spacing();
+        ImGui::Text("Click 'Benchmark All' in the Algorithm Selector to start a benchmark.");
       }
-    } else {
-      ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "No benchmark data available");
+
       ImGui::Spacing();
-      ImGui::Text("Click 'Benchmark All' in the Algorithm Selector to start a benchmark.");
-    }
 
-    ImGui::Spacing();
+      if (benchmark_running_) {
+        if (ImGui::Button("Cancel Benchmark", ImVec2(150, 0))) {
+          cancelAlgorithm();  // Reuse cancel functionality
+          benchmark_running_ = false;
+        }
+      } else {
+        if (ImGui::Button("Export Results", ImVec2(150, 0))) {
+          // TODO: Implement exporting results to CSV
+          // This would be a nice feature but isn't essential
+        }
 
-    if (benchmark_running_) {
-      if (ImGui::Button("Cancel Benchmark", ImVec2(150, 0))) {
-        cancelAlgorithm();  // Reuse cancel functionality
-        benchmark_running_ = false;
-      }
-    } else {
-      if (ImGui::Button("Export Results", ImVec2(150, 0))) {
-        // TODO: Implement exporting results to CSV
-        // This would be a nice feature but isn't essential
-      }
+        ImGui::SameLine();
 
-      ImGui::SameLine();
-
-      if (ImGui::Button("Clear Results", ImVec2(150, 0))) {
-        benchmark_results_.clear();
+        if (ImGui::Button("Clear Results", ImVec2(150, 0))) {
+          std::lock_guard<std::mutex> lock(benchmark_results_mutex_);
+          benchmark_results_.clear();
+        }
       }
     }
-  }
 
-  // Sync our internal state when window is closed via the X button
-  if (p_open && !*p_open) {
-    show_benchmark_results_ = false;
-  }
+    // Sync our internal state when window is closed via the X button
+    if (p_open && !*p_open) {
+      show_benchmark_results_ = false;
+    }
 
-  ImGui::End();
+    ImGui::End();
+  }
 }
 
 }  // namespace visualization
