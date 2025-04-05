@@ -31,7 +31,11 @@ class GVNS : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     int max_iterations = 50,
     const std::string& generator_name = "GRASPCVGenerator",
     std::vector<std::string> neighborhoods =
-      {"TaskReinsertionSearch", "TaskExchangeSearch", "TwoOptSearch"}
+      {"TaskReinsertionWithinRouteSearch",
+       "TaskReinsertionBetweenRoutesSearch",
+       "TaskExchangeWithinRouteSearch",
+       "TaskExchangeBetweenRoutesSearch",
+       "TwoOptSearch"}
   )
       : max_iterations_(max_iterations),
         generator_name_(generator_name),

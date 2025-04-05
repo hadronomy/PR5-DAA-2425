@@ -31,7 +31,11 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     int num_starts = 10,
     const std::string& generator_name = "GreedyCVGenerator",
     std::vector<std::string> search_names =
-      {"TaskReinsertionSearch", "TaskExchangeSearch", "TwoOptSearch"}
+      {"TaskReinsertionWithinRouteSearch",
+       "TaskReinsertionBetweenRoutesSearch",
+       "TaskExchangeWithinRouteSearch",
+       "TaskExchangeBetweenRoutesSearch",
+       "TwoOptSearch"}
   )
       : num_starts_(num_starts),
         generator_name_(generator_name),

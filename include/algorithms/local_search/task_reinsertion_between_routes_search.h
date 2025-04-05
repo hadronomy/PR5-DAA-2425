@@ -14,23 +14,24 @@ namespace daa {
 namespace algorithm {
 
 /**
- * @brief Task Exchange local search for CV routes
+ * @brief Task Reinsertion Between Routes local search for CV routes
  *
- * Swaps the positions of two collection zones (within the same route or between two different
- * routes)
+ * Tries to move a collection zone from its current position in one route
+ * to a position in a different route. This is a specialized version of 
+ * TaskReinsertionSearch that only considers moves between different routes.
  */
-class TaskExchangeSearch : public CVLocalSearch {
+class TaskReinsertionBetweenRoutesSearch : public CVLocalSearch {
  public:
   /**
    * @brief Constructor with parameters
    * @param max_iterations Maximum number of iterations
    * @param first_improvement Whether to use first improvement
    */
-  explicit TaskExchangeSearch(int max_iterations = 100, bool first_improvement = false)
+  explicit TaskReinsertionBetweenRoutesSearch(int max_iterations = 100, bool first_improvement = false)
       : CVLocalSearch(max_iterations, first_improvement) {}
 
   /**
-   * @brief Search the exchange neighborhood
+   * @brief Search the reinsertion neighborhood (between routes only)
    */
   VRPTSolution searchNeighborhood(const VRPTProblem& problem, const VRPTSolution& current_solution)
     override {
@@ -45,53 +46,65 @@ class TaskExchangeSearch : public CVLocalSearch {
     // Create a copy of the solution's CV routes to modify
     auto routes = current_solution.getCVRoutes();
 
-    // Try to swap each pair of collection zones
+    // Need at least 2 routes to perform between-route reinsertions
+    if (routes.size() < 2) {
+      return best_solution;
+    }
+
+    // Try to move each collection zone to a different route
     for (size_t r1_idx = 0; r1_idx < routes.size(); ++r1_idx) {
       const auto& r1 = routes[r1_idx];
       const auto& locations1 = r1.locationIds();
 
+      // Check each location in the route
       for (size_t pos1 = 0; pos1 < locations1.size(); ++pos1) {
-        const std::string& location_id1 = locations1[pos1];
-        const auto& location1 = problem.getLocation(location_id1);
+        const std::string& location_id = locations1[pos1];
+        const auto& location = problem.getLocation(location_id);
 
         // Only consider collection zones (not SWTS or depot)
-        if (location1.type() != LocationType::COLLECTION_ZONE) {
+        if (location.type() != LocationType::COLLECTION_ZONE) {
           continue;
         }
 
-        // Find another zone to swap with
-        for (size_t r2_idx = r1_idx; r2_idx < routes.size(); ++r2_idx) {
+        // Try to move this zone to every possible position in every other route
+        for (size_t r2_idx = 0; r2_idx < routes.size(); ++r2_idx) {
+          // Skip if it's the same route
+          if (r1_idx == r2_idx) {
+            continue;
+          }
+
           const auto& r2 = routes[r2_idx];
           const auto& locations2 = r2.locationIds();
 
-          size_t start_pos2 = (r1_idx == r2_idx) ? pos1 + 1 : 0;
-          for (size_t pos2 = start_pos2; pos2 < locations2.size(); ++pos2) {
-            const std::string& location_id2 = locations2[pos2];
-            const auto& location2 = problem.getLocation(location_id2);
-
-            // Only consider collection zones
-            if (location2.type() != LocationType::COLLECTION_ZONE) {
-              continue;
-            }
-
-            // Create a new solution with the swap
+          // Try each possible insertion position in the target route
+          for (size_t pos2 = 0; pos2 <= locations2.size(); ++pos2) {
+            // Create a new solution with the move
             VRPTSolution new_solution = current_solution;
             auto& new_routes = new_solution.getCVRoutes();
 
-            // Create new route sequences with the swap
-            std::vector<std::string> new_r1_locations = locations1;
-            std::vector<std::string> new_r2_locations = locations2;
-
-            if (r1_idx == r2_idx) {
-              // Swap within same route
-              std::swap(new_r1_locations[pos1], new_r1_locations[pos2]);
-            } else {
-              // Swap between different routes
-              new_r1_locations[pos1] = location_id2;
-              new_r2_locations[pos2] = location_id1;
+            // Remove the zone from its original route
+            std::vector<std::string> new_r1_locations;
+            for (size_t i = 0; i < locations1.size(); ++i) {
+              if (i != pos1) {
+                new_r1_locations.push_back(locations1[i]);
+              }
             }
 
-            // Rebuild the routes with the new sequences
+            // Insert the zone into the target route
+            std::vector<std::string> new_r2_locations;
+            for (size_t i = 0; i < locations2.size(); ++i) {
+              if (i == pos2) {
+                new_r2_locations.push_back(location_id);
+              }
+              new_r2_locations.push_back(locations2[i]);
+            }
+
+            // Handle insertion at the end
+            if (pos2 == locations2.size()) {
+              new_r2_locations.push_back(location_id);
+            }
+
+            // Rebuild the routes with the new location sequences
             Capacity cv_capacity = problem.getCVCapacity();
             Duration cv_max_duration = problem.getCVMaxDuration();
 
@@ -105,32 +118,28 @@ class TaskExchangeSearch : public CVLocalSearch {
             }
 
             // Check if the first route ends at depot and has 0 load
-            if (new_r1.currentLoad().value() != 0.0 ||
-                (new_r1.lastLocationId() != problem.getDepot().id())) {
+            if (!new_r1_locations.empty() && (new_r1.currentLoad().value() != 0.0 ||
+                                              new_r1.lastLocationId() != problem.getDepot().id())) {
               continue;  // Skip invalid routes
             }
 
-            if (r1_idx != r2_idx) {
-              CVRoute new_r2(r2.vehicleId(), cv_capacity, cv_max_duration);
-              for (const auto& loc_id : new_r2_locations) {
-                if (!new_r2.canVisit(loc_id, problem)) {
-                  continue;
-                }
-                new_r2.addLocation(loc_id, problem);
+            CVRoute new_r2(r2.vehicleId(), cv_capacity, cv_max_duration);
+            for (const auto& loc_id : new_r2_locations) {
+              if (!new_r2.canVisit(loc_id, problem)) {
+                continue;
               }
-
-              // Check if the second route ends at depot and has 0 load
-              if (new_r2.currentLoad().value() != 0.0 ||
-                  (new_r2.lastLocationId() != problem.getDepot().id())) {
-                continue;  // Skip invalid routes
-              }
-
-              // Update the second route
-              new_routes[r2_idx] = new_r2;
+              new_r2.addLocation(loc_id, problem);
             }
 
-            // Update the first route
+            // Check if the second route ends at depot and has 0 load
+            if (!new_r2_locations.empty() && (new_r2.currentLoad().value() != 0.0 ||
+                                              new_r2.lastLocationId() != problem.getDepot().id())) {
+              continue;  // Skip invalid routes
+            }
+
+            // Update the routes in the new solution
             new_routes[r1_idx] = new_r1;
+            new_routes[r2_idx] = new_r2;
 
             // Remove empty routes
             new_routes.erase(
@@ -173,13 +182,13 @@ class TaskExchangeSearch : public CVLocalSearch {
     return best_solution;
   }
 
-  std::string name() const override { return "Task Exchange Search"; }
+  std::string name() const override { return "Task Reinsertion Between Routes Search"; }
 };
 
 namespace {
-inline static const bool TaskExchangeSearch_registered_gen =
+inline static const bool TaskReinsertionBetweenRoutesSearch_registered_gen =
   MetaHeuristicFactory<VRPTSolution, VRPTProblem, TypedAlgorithm<VRPTProblem, VRPTSolution>>::
-    registerSearch<TaskExchangeSearch>("TaskExchangeSearch");
+    registerSearch<TaskReinsertionBetweenRoutesSearch>("TaskReinsertionBetweenRoutesSearch");
 }
 
 }  // namespace algorithm

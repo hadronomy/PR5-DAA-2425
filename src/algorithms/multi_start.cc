@@ -38,6 +38,16 @@ void MultiStart::renderConfigurationUI() {
   }
 
   ImGui::Text("Neighborhood Structures:");
+  ImGui::TextDisabled("(Hover for info)");
+  if (ImGui::IsItemHovered()) {
+    ImGui::BeginTooltip();
+    ImGui::Text("TaskExchangeWithinRouteSearch: Swaps tasks within the same route");
+    ImGui::Text("TaskExchangeBetweenRoutesSearch: Swaps tasks between different routes");
+    ImGui::Text("TaskReinsertionWithinRouteSearch: Moves tasks within the same route");
+    ImGui::Text("TaskReinsertionBetweenRoutesSearch: Moves tasks between different routes");
+    ImGui::Text("TwoOptSearch: Reverses segments within routes");
+    ImGui::EndTooltip();
+  }
 
   // Get all available searches
   const auto& available_searches = AlgorithmRegistry::getAvailableSearches();
