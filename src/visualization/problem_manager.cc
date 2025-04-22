@@ -12,6 +12,7 @@
 #include "imgui.h"
 #include "tinyfiledialogs.h"
 #include "visualization/csv_exporter.h"
+#include "visualization/latex_exporter.h"
 
 namespace fs = std::filesystem;
 
@@ -881,6 +882,7 @@ void ProblemManager::renderBenchmarkResultsWindow(bool* p_open) {
           benchmark_running_ = false;
         }
       } else {
+        // Export button and popup
         if (ImGui::Button("Export Results", ImVec2(150, 0))) {
           // Get a thread-safe copy of the benchmark results
           std::vector<BenchmarkResult> results_copy;
@@ -893,28 +895,76 @@ void ProblemManager::renderBenchmarkResultsWindow(bool* p_open) {
             // Show a message if there are no results to export
             ImGui::OpenPopup("No Results##ExportError");
           } else {
-            // Use tinyfiledialogs to get save location
-            const char* filters[] = {"*.csv"};
-            const char* filepath = tinyfd_saveFileDialog(
-              "Save Benchmark Results",  // title
-              "benchmark_results.csv",   // default filename
-              1,                         // number of filter patterns
-              filters,                   // filter patterns
-              "CSV Files"                // filter description
+            // Open the export format popup
+            ImGui::OpenPopup("Export Format##Popup");
+          }
+        }
+
+        // Export format popup
+        if (ImGui::BeginPopup("Export Format##Popup")) {
+          ImGui::Text("Select Export Format:");
+          ImGui::Separator();
+
+          // Get a thread-safe copy of the benchmark results for the popup
+          std::vector<BenchmarkResult> results_copy;
+          {
+            std::lock_guard<std::mutex> lock(benchmark_results_mutex_);
+            results_copy = benchmark_results_;
+          }
+
+          if (ImGui::MenuItem("CSV")) {
+            // Use tinyfiledialogs to get save location for CSV
+            const char* csv_filters[] = {"*.csv"};
+            const char* csv_filepath = tinyfd_saveFileDialog(
+              "Save Benchmark Results as CSV",  // title
+              "benchmark_results.csv",          // default filename
+              1,                                // number of filter patterns
+              csv_filters,                      // filter patterns
+              "CSV Files"                       // filter description
             );
 
-            if (filepath) {
+            if (csv_filepath) {
               // Export the results to CSV
-              bool success = CSVExporter::exportToCSV(results_copy, filepath);
+              bool success = CSVExporter::exportToCSV(results_copy, csv_filepath);
 
               // Show success/failure message
               if (success) {
+                ImGui::CloseCurrentPopup();  // Close the format popup
                 ImGui::OpenPopup("Export Success");
               } else {
+                ImGui::CloseCurrentPopup();  // Close the format popup
                 ImGui::OpenPopup("Export Failed");
               }
             }
           }
+
+          if (ImGui::MenuItem("LaTeX")) {
+            // Use tinyfiledialogs to get save location for LaTeX
+            const char* tex_filters[] = {"*.tex"};
+            const char* tex_filepath = tinyfd_saveFileDialog(
+              "Save Benchmark Results as LaTeX",  // title
+              "benchmark_results.tex",            // default filename
+              1,                                  // number of filter patterns
+              tex_filters,                        // filter patterns
+              "LaTeX Files"                       // filter description
+            );
+
+            if (tex_filepath) {
+              // Export the results to LaTeX
+              bool success = LatexExporter::exportToLatex(results_copy, tex_filepath);
+
+              // Show success/failure message
+              if (success) {
+                ImGui::CloseCurrentPopup();  // Close the format popup
+                ImGui::OpenPopup("Export Success");
+              } else {
+                ImGui::CloseCurrentPopup();  // Close the format popup
+                ImGui::OpenPopup("Export Failed");
+              }
+            }
+          }
+
+          ImGui::EndPopup();
         }
 
         ImGui::SameLine();
