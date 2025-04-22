@@ -9,8 +9,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "algorithms/neighborhood_bitmap.h"
-
 #include "algorithm_registry.h"
 #include "algorithms/greedy_tv_scheduler.h"
 #include "algorithms/vrpt_solution.h"
@@ -21,10 +19,10 @@ namespace daa {
 namespace algorithm {
 
 /**
- * @brief Multi-Start metaheuristic for VRPT problem with RVND
+ * @brief Multi-Start metaheuristic for VRPT problem with sequential neighborhood search
  *
  * Generates multiple initial solutions using GRASP and
- * applies RVND (Random Variable Neighborhood Descent) to each,
+ * applies a sequential execution of neighborhood structures to each,
  * returning the best solution found.
  */
 class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
@@ -104,19 +102,39 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
           // Generate an initial solution
           VRPTSolution current_solution = thread_generator->generateSolution(problem);
 
-          // Apply Random VND
+          // Apply sequential neighborhood search
           if (!thread_searches.empty()) {
             bool improved = true;
 
             while (improved) {
               improved = false;
 
-              // Create bitmap of available neighborhoods
-              NeighborhoodBitmap available_searches(thread_searches.size());
+              // Define the order of neighborhood searches
+              // Start with local moves, then progress to more complex inter-route moves
+              std::vector<std::string> search_order = {
+                "TaskReinsertionWithinRouteSearch",
+                "TaskExchangeWithinRouteSearch",
+                "TwoOptSearch",
+                "TaskReinsertionBetweenRoutesSearch",
+                "TaskExchangeBetweenRoutesSearch"
+              };
 
-              while (available_searches.hasAvailable() && !improved) {
-                // Randomly select neighborhood
-                size_t search_idx = available_searches.selectRandom(gen);
+              // Create a map of search names to their indices in thread_searches
+              std::unordered_map<std::string, size_t> search_indices;
+              for (size_t i = 0; i < search_names_.size(); ++i) {
+                search_indices[search_names_[i]] = i;
+              }
+
+              // Apply each neighborhood search in sequence
+              // The output of one search becomes the input of the next
+              for (const auto& search_name : search_order) {
+                // Skip if this search is not in our available searches
+                auto it = search_indices.find(search_name);
+                if (it == search_indices.end()) {
+                  continue;
+                }
+
+                size_t search_idx = it->second;
 
                 // Apply search
                 VRPTSolution candidate =
@@ -164,8 +182,6 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
                 if (is_better) {
                   current_solution = candidate;
                   improved = true;
-                } else {
-                  available_searches.markUnavailable(search_idx);
                 }
               }
             }
@@ -223,15 +239,15 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
   }
 
   std::string name() const override {
-    return "Multi-Start-RVND(" + std::to_string(num_starts_) + ", " + generator_name_ + ", " +
+    return "Multi-Start-Sequential(" + std::to_string(num_starts_) + ", " + generator_name_ + ", " +
            std::to_string(search_names_.size()) + " neighborhoods)";
   }
 
   std::string description() const override {
-    return "Multi-Start metaheuristic with RVND that generates " + std::to_string(num_starts_) +
+    return "Multi-Start metaheuristic that generates " + std::to_string(num_starts_) +
            " initial solutions using " + generator_name_ +
-           " and improves each with Random VND using " + std::to_string(search_names_.size()) +
-           " neighborhoods";
+           " and improves each with sequential neighborhood search using " +
+           std::to_string(search_names_.size()) + " neighborhoods";
   }
 
   std::string timeComplexity() const override {
@@ -326,7 +342,7 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
 };
 
 // Register the algorithm with default parameters
-REGISTER_ALGORITHM(MultiStart, "MultiStart-RVND");
+REGISTER_ALGORITHM(MultiStart, "MultiStart-Sequential");
 
 }  // namespace algorithm
 }  // namespace daa

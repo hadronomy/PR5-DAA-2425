@@ -8,7 +8,7 @@ namespace algorithm {
 
 void VRPTSolver::renderConfigurationUI() {
   // Step 1: Select algorithm type
-  std::vector<std::string> meta_algorithms = {"GVNS", "MultiStart-RVND"};
+  std::vector<std::string> meta_algorithms = {"GVNS", "MultiStart-Sequential"};
 
   ImGui::TextColored(ImVec4(0.6f, 0.8f, 1.0f, 1.0f), "Step 1: Select Algorithm");
 
@@ -61,8 +61,7 @@ void VRPTSolver::renderConfigurationUI() {
       if (ImGui::Selectable(algo.c_str(), is_selected)) {
         // Set the selected algorithm in the problem manager
         tv_algorithm_name_ = algo;
-        tv_algorithm_ =
-          AlgorithmRegistry::createTyped<VRPTData, VRPTSolution>(tv_algorithm_name_);
+        tv_algorithm_ = AlgorithmRegistry::createTyped<VRPTData, VRPTSolution>(tv_algorithm_name_);
       }
       if (is_selected) {
         ImGui::SetItemDefaultFocus();
