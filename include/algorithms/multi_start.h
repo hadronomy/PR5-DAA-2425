@@ -12,6 +12,7 @@
 #include "algorithms/neighborhood_bitmap.h"
 
 #include "algorithm_registry.h"
+#include "algorithms/greedy_tv_scheduler.h"
 #include "algorithms/vrpt_solution.h"
 #include "meta_heuristic_components.h"
 #include "meta_heuristic_factory.h"
@@ -40,7 +41,8 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
   )
       : num_starts_(num_starts),
         generator_name_(generator_name),
-        search_names_(std::move(search_names)) {
+        search_names_(std::move(search_names)),
+        tv_scheduler_(std::make_unique<GreedyTVScheduler>()) {
     // Initialize components
     initializeComponents();
   }
@@ -65,6 +67,7 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
     std::mutex solutions_mutex;
     std::optional<VRPTSolution> best_solution;
     size_t best_cv_count = std::numeric_limits<size_t>::max();
+    size_t best_total_vehicles = std::numeric_limits<size_t>::max();
     double best_total_duration = std::numeric_limits<double>::max();
 
     // Create a thread pool
@@ -123,12 +126,39 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
                 size_t candidate_cv_count = candidate.getCVCount();
                 double candidate_duration = candidate.totalDuration().value();
 
+                // Run TV scheduler to get total vehicle count
+                size_t candidate_total_vehicles = candidate_cv_count;
+                size_t current_total_vehicles = current_solution.getCVCount();
+
+                try {
+                  // Only run TV scheduler if CV count is not worse
+                  if (candidate_cv_count <= current_solution.getCVCount()) {
+                    // Schedule TVs for candidate
+                    VRPTSolution candidate_with_tvs = tv_scheduler_->solve({problem, candidate});
+                    candidate_total_vehicles = candidate_cv_count + candidate_with_tvs.getTVCount();
+
+                    // Schedule TVs for current solution if needed
+                    if (candidate_cv_count == current_solution.getCVCount()) {
+                      VRPTSolution current_with_tvs =
+                        tv_scheduler_->solve({problem, current_solution});
+                      current_total_vehicles =
+                        current_solution.getCVCount() + current_with_tvs.getTVCount();
+                    }
+                  }
+                } catch (const std::exception&) {
+                  // If TV scheduling fails, fall back to comparing just CV count and duration
+                }
+
                 bool is_better = false;
                 if (candidate_cv_count < current_solution.getCVCount()) {
                   is_better = true;
-                } else if (candidate_cv_count == current_solution.getCVCount() &&
-                           candidate_duration < current_solution.totalDuration().value()) {
-                  is_better = true;
+                } else if (candidate_cv_count == current_solution.getCVCount()) {
+                  if (candidate_total_vehicles < current_total_vehicles) {
+                    is_better = true;
+                  } else if (candidate_total_vehicles == current_total_vehicles &&
+                             candidate_duration < current_solution.totalDuration().value()) {
+                    is_better = true;
+                  }
                 }
 
                 if (is_better) {
@@ -148,18 +178,33 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
             double total_duration = current_solution.totalDuration().value();
             size_t cv_count = current_solution.getCVCount();
 
+            // Run TV scheduler to get total vehicle count
+            size_t total_vehicles = cv_count;
+            try {
+              VRPTSolution solution_with_tvs = tv_scheduler_->solve({problem, current_solution});
+              total_vehicles = cv_count + solution_with_tvs.getTVCount();
+            } catch (const std::exception&) {
+              // If TV scheduling fails, just use CV count
+            }
+
             bool is_better = false;
             if (!best_solution) {
               is_better = true;
             } else if (cv_count < best_cv_count) {
               is_better = true;
-            } else if (cv_count == best_cv_count && total_duration < best_total_duration) {
-              is_better = true;
+            } else if (cv_count == best_cv_count) {
+              if (total_vehicles < best_total_vehicles) {
+                is_better = true;
+              } else if (total_vehicles == best_total_vehicles &&
+                         total_duration < best_total_duration) {
+                is_better = true;
+              }
             }
 
             if (is_better) {
               best_solution = current_solution;
               best_cv_count = cv_count;
+              best_total_vehicles = total_vehicles;
               best_total_duration = total_duration;
             }
           }
@@ -203,6 +248,7 @@ class MultiStart : public TypedAlgorithm<VRPTProblem, VRPTSolution> {
   // Component instances for reuse
   std::unique_ptr<::meta::SolutionGenerator<VRPTSolution, VRPTProblem>> generator_;
   std::vector<std::unique_ptr<::meta::LocalSearch<VRPTSolution, VRPTProblem>>> local_searches_;
+  std::unique_ptr<GreedyTVScheduler> tv_scheduler_;
 
   // Map to track neighborhood search instances by name for UI configuration
   std::unordered_map<std::string, ::meta::LocalSearch<VRPTSolution, VRPTProblem>*> search_map_;
