@@ -10,6 +10,8 @@
 
 #include "algorithm_registry.h"
 #include "imgui.h"
+#include "tinyfiledialogs.h"
+#include "visualization/csv_exporter.h"
 
 namespace fs = std::filesystem;
 
@@ -555,10 +557,15 @@ bool ProblemManager::runBenchmark(int runs_per_instance) {
             // Store the result in a thread-safe way
             BenchmarkResult result;
             result.instance_name = fs::path(problem_file).filename().string();
+            result.algorithm_name = current_algorithm_->name();
+
             result.num_zones = num_zones;
             result.run_number = run + 1;
             result.cv_count = solution.getCVRoutes().size();
             result.tv_count = solution.getTVRoutes().size();
+            result.zones_visited = solution.visitedZones(*problem);
+            result.total_duration = solution.totalDuration().value();
+            result.total_waste = solution.totalWasteCollected().value();
             result.cpu_time_ms = elapsed_ms;
 
             {
@@ -754,16 +761,20 @@ void ProblemManager::renderBenchmarkResultsWindow(bool* p_open) {
       if (!results_copy.empty()) {
         if (ImGui::BeginTable(
               "BenchmarkTable",
-              6,
+              10,
               ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
                 ImGuiTableFlags_Sortable
             )) {
 
           ImGui::TableSetupColumn("Instance", ImGuiTableColumnFlags_DefaultSort);
-          ImGui::TableSetupColumn("Zones", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+          ImGui::TableSetupColumn("Algorithm", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+          ImGui::TableSetupColumn("Total Zones", ImGuiTableColumnFlags_WidthFixed, 60.0f);
           ImGui::TableSetupColumn("Run #", ImGuiTableColumnFlags_WidthFixed, 60.0f);
           ImGui::TableSetupColumn("#CV", ImGuiTableColumnFlags_WidthFixed, 60.0f);
           ImGui::TableSetupColumn("#TV", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+          ImGui::TableSetupColumn("Zones Visited", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+          ImGui::TableSetupColumn("Duration", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+          ImGui::TableSetupColumn("Waste", ImGuiTableColumnFlags_WidthFixed, 80.0f);
           ImGui::TableSetupColumn("CPU Time (ms)", ImGuiTableColumnFlags_WidthFixed, 120.0f);
           ImGui::TableHeadersRow();
 
@@ -776,18 +787,30 @@ void ProblemManager::renderBenchmarkResultsWindow(bool* p_open) {
             ImGui::Text("%s", result.instance_name.c_str());
 
             ImGui::TableSetColumnIndex(1);
-            ImGui::Text("%d", result.num_zones);
+            ImGui::Text("%s", result.algorithm_name.c_str());
 
             ImGui::TableSetColumnIndex(2);
-            ImGui::Text("%d", result.run_number);
+            ImGui::Text("%d", result.num_zones);
 
             ImGui::TableSetColumnIndex(3);
-            ImGui::Text("%d", result.cv_count);
+            ImGui::Text("%d", result.run_number);
 
             ImGui::TableSetColumnIndex(4);
-            ImGui::Text("%d", result.tv_count);
+            ImGui::Text("%d", result.cv_count);
 
             ImGui::TableSetColumnIndex(5);
+            ImGui::Text("%d", result.tv_count);
+
+            ImGui::TableSetColumnIndex(6);
+            ImGui::Text("%d", result.zones_visited);
+
+            ImGui::TableSetColumnIndex(7);
+            ImGui::Text("%.2f", result.total_duration);
+
+            ImGui::TableSetColumnIndex(8);
+            ImGui::Text("%.2f", result.total_waste);
+
+            ImGui::TableSetColumnIndex(9);
             ImGui::Text("%.2f", result.cpu_time_ms);
           }
 
@@ -798,12 +821,16 @@ void ProblemManager::renderBenchmarkResultsWindow(bool* p_open) {
           ImGui::Text("AVERAGES");
 
           // Calculate averages (using the thread-safe copy)
-          double avg_cv = 0.0, avg_tv = 0.0, avg_time = 0.0;
+          double avg_cv = 0.0, avg_tv = 0.0, avg_zones_visited = 0.0;
+          double avg_duration = 0.0, avg_waste = 0.0, avg_time = 0.0;
           int count = 0;
 
           for (const auto& result : results_copy) {
             avg_cv += result.cv_count;
             avg_tv += result.tv_count;
+            avg_zones_visited += result.zones_visited;
+            avg_duration += result.total_duration;
+            avg_waste += result.total_waste;
             avg_time += result.cpu_time_ms;
             count++;
           }
@@ -811,17 +838,30 @@ void ProblemManager::renderBenchmarkResultsWindow(bool* p_open) {
           if (count > 0) {
             avg_cv /= count;
             avg_tv /= count;
+            avg_zones_visited /= count;
+            avg_duration /= count;
+            avg_waste /= count;
             avg_time /= count;
           }
 
-          // Skip zones and run# columns
-          ImGui::TableSetColumnIndex(3);
-          ImGui::Text("%.2f", avg_cv);
+          // Skip instance, algorithm, total zones, and run# columns
 
           ImGui::TableSetColumnIndex(4);
-          ImGui::Text("%.2f", avg_tv);
+          ImGui::Text("%.2f", avg_cv);
 
           ImGui::TableSetColumnIndex(5);
+          ImGui::Text("%.2f", avg_tv);
+
+          ImGui::TableSetColumnIndex(6);
+          ImGui::Text("%.2f", avg_zones_visited);
+
+          ImGui::TableSetColumnIndex(7);
+          ImGui::Text("%.2f", avg_duration);
+
+          ImGui::TableSetColumnIndex(8);
+          ImGui::Text("%.2f", avg_waste);
+
+          ImGui::TableSetColumnIndex(9);
           ImGui::Text("%.2f", avg_time);
           ImGui::PopStyleColor();
 
@@ -842,8 +882,39 @@ void ProblemManager::renderBenchmarkResultsWindow(bool* p_open) {
         }
       } else {
         if (ImGui::Button("Export Results", ImVec2(150, 0))) {
-          // TODO: Implement exporting results to CSV
-          // This would be a nice feature but isn't essential
+          // Get a thread-safe copy of the benchmark results
+          std::vector<BenchmarkResult> results_copy;
+          {
+            std::lock_guard<std::mutex> lock(benchmark_results_mutex_);
+            results_copy = benchmark_results_;
+          }
+
+          if (results_copy.empty()) {
+            // Show a message if there are no results to export
+            ImGui::OpenPopup("No Results##ExportError");
+          } else {
+            // Use tinyfiledialogs to get save location
+            const char* filters[] = {"*.csv"};
+            const char* filepath = tinyfd_saveFileDialog(
+              "Save Benchmark Results",  // title
+              "benchmark_results.csv",   // default filename
+              1,                         // number of filter patterns
+              filters,                   // filter patterns
+              "CSV Files"                // filter description
+            );
+
+            if (filepath) {
+              // Export the results to CSV
+              bool success = CSVExporter::exportToCSV(results_copy, filepath);
+
+              // Show success/failure message
+              if (success) {
+                ImGui::OpenPopup("Export Success");
+              } else {
+                ImGui::OpenPopup("Export Failed");
+              }
+            }
+          }
         }
 
         ImGui::SameLine();
@@ -851,6 +922,39 @@ void ProblemManager::renderBenchmarkResultsWindow(bool* p_open) {
         if (ImGui::Button("Clear Results", ImVec2(150, 0))) {
           std::lock_guard<std::mutex> lock(benchmark_results_mutex_);
           benchmark_results_.clear();
+        }
+
+        // Export error popup
+        if (ImGui::BeginPopupModal(
+              "No Results##ExportError", NULL, ImGuiWindowFlags_AlwaysAutoResize
+            )) {
+          ImGui::Text("There are no benchmark results to export.");
+          ImGui::Separator();
+          if (ImGui::Button("OK", ImVec2(120, 0))) {
+            ImGui::CloseCurrentPopup();
+          }
+          ImGui::EndPopup();
+        }
+
+        // Export success popup
+        if (ImGui::BeginPopupModal("Export Success", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+          ImGui::Text("Benchmark results exported successfully.");
+          ImGui::Separator();
+          if (ImGui::Button("OK", ImVec2(120, 0))) {
+            ImGui::CloseCurrentPopup();
+          }
+          ImGui::EndPopup();
+        }
+
+        // Export failure popup
+        if (ImGui::BeginPopupModal("Export Failed", NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+          ImGui::Text("Failed to export benchmark results.");
+          ImGui::Text("Please check file permissions and try again.");
+          ImGui::Separator();
+          if (ImGui::Button("OK", ImVec2(120, 0))) {
+            ImGui::CloseCurrentPopup();
+          }
+          ImGui::EndPopup();
         }
       }
     }

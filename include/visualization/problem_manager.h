@@ -136,12 +136,16 @@ class ProblemManager {
 
   // Benchmark-related structures and methods
   struct BenchmarkResult {
-    std::string instance_name;
-    int num_zones;
-    int run_number;
-    int cv_count;
-    int tv_count;
-    double cpu_time_ms;
+    std::string instance_name;   // Name of the problem instance
+    std::string algorithm_name;  // Name of the algorithm used
+    int num_zones;               // Total number of zones in the problem
+    int run_number;              // Run number (for multiple runs)
+    int cv_count;                // Number of collection vehicles used
+    int tv_count;                // Number of transport vehicles used
+    int zones_visited;           // Number of zones visited in the solution
+    double total_duration;       // Total duration of all routes
+    double total_waste;          // Total waste collected
+    double cpu_time_ms;          // CPU time in milliseconds
   };
 
   // Run benchmark on all available problems
